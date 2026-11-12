@@ -8,6 +8,8 @@ import '../core/models.dart';
 import '../core/ticket.dart';
 import 'app_state.dart';
 
+enum KeypadTarget { quantity, tendered }
+
 /// The open ticket: lines, order details and the per-branch durable draft.
 class CartState extends ChangeNotifier {
   CartState(this._app);
@@ -26,6 +28,8 @@ class CartState extends ChangeNotifier {
   String notes = '';
   String payment = 'cash';
   String tendered = '';
+  String nextQuantity = '';
+  KeypadTarget keypadTarget = KeypadTarget.quantity;
   bool saving = false;
 
   int get totalCents => lines.fold(0, (sum, line) => sum + line.subtotalCents);
@@ -33,6 +37,12 @@ class CartState extends ChangeNotifier {
   double get itemCount =>
       lines.fold(0.0, (sum, line) => sum + (double.tryParse(line.qty) ?? 0));
   bool get isEmpty => lines.isEmpty;
+  bool get needsOrderDetails =>
+      (orderType == 'dine_in' && table.trim().isEmpty) ||
+      (orderType == 'delivery' &&
+          (customer.trim().isEmpty ||
+              phone.trim().isEmpty ||
+              address.trim().isEmpty));
   double? get tenderedValue => double.tryParse(tendered.trim());
   bool get canSell =>
       lines.isNotEmpty && !saving && !_app.shiftClosed && _app.branchId != null;
@@ -50,15 +60,22 @@ class CartState extends ChangeNotifier {
     _ => 'تيك أواي',
   };
 
-  bool add(PosProduct product, {String quantity = '1'}) {
-    if (!isValidQty(quantity)) {
+  String get nextQuantityDisplay => nextQuantity.isEmpty ? '1' : nextQuantity;
+  bool get keypadTargetsTendered => keypadTarget == KeypadTarget.tendered;
+  String get keypadDisplay => keypadTargetsTendered
+      ? (tendered.isEmpty ? '0' : tendered)
+      : nextQuantityDisplay;
+
+  bool add(PosProduct product, {String? quantity}) {
+    final selectedQuantity = quantity ?? nextQuantityDisplay;
+    if (!isValidQty(selectedQuantity)) {
       _app.tell(
         'الكمية يجب أن تكون بين 0.001 و 1000 وبثلاث خانات عشرية كحد أقصى.',
         isError: true,
       );
       return false;
     }
-    final amount = parseQty(quantity);
+    final amount = parseQty(selectedQuantity);
     final index = lines.indexWhere(
       (line) => line.productId == product.id && line.price == product.price,
     );
@@ -79,8 +96,68 @@ class CartState extends ChangeNotifier {
         ),
       );
     }
+    if (quantity == null) nextQuantity = '';
+    keypadTarget = KeypadTarget.quantity;
     _changed();
     return true;
+  }
+
+  void appendNextQuantity(String value) {
+    if (nextQuantity.length >= 7) return;
+    if (value == '.' && nextQuantity.contains('.')) return;
+    if (value == '.') {
+      nextQuantity = nextQuantity.isEmpty ? '0.' : '$nextQuantity.';
+    } else if (nextQuantity == '0') {
+      nextQuantity = value;
+    } else {
+      nextQuantity += value;
+    }
+    notifyListeners();
+  }
+
+  void backspaceNextQuantity() {
+    if (nextQuantity.isEmpty) return;
+    nextQuantity = nextQuantity.substring(0, nextQuantity.length - 1);
+    notifyListeners();
+  }
+
+  void clearNextQuantity() {
+    if (nextQuantity.isEmpty) return;
+    nextQuantity = '';
+    notifyListeners();
+  }
+
+  void selectKeypadTarget(KeypadTarget target) {
+    if (keypadTarget == target) return;
+    keypadTarget = target;
+    notifyListeners();
+  }
+
+  void appendKeypadValue(String value) {
+    if (!keypadTargetsTendered) {
+      appendNextQuantity(value);
+      return;
+    }
+    if (tendered.length >= 9) return;
+    if (value == '.' && tendered.contains('.')) return;
+    if (value == '.') {
+      tendered = tendered.isEmpty ? '0.' : '$tendered.';
+    } else if (tendered == '0') {
+      tendered = value;
+    } else {
+      tendered += value;
+    }
+    _changed();
+  }
+
+  void backspaceKeypad() {
+    if (!keypadTargetsTendered) {
+      backspaceNextQuantity();
+      return;
+    }
+    if (tendered.isEmpty) return;
+    tendered = tendered.substring(0, tendered.length - 1);
+    _changed();
   }
 
   void increment(int index) {
@@ -149,6 +226,8 @@ class CartState extends ChangeNotifier {
 
   void clear() {
     lines.clear();
+    nextQuantity = '';
+    keypadTarget = KeypadTarget.quantity;
     _changed();
   }
 
@@ -163,6 +242,8 @@ class CartState extends ChangeNotifier {
     notes = '';
     payment = 'cash';
     tendered = '';
+    nextQuantity = '';
+    keypadTarget = KeypadTarget.quantity;
     unawaited(persistDraft());
     notifyListeners();
   }
@@ -200,6 +281,8 @@ class CartState extends ChangeNotifier {
   Future<void> loadDraft() async {
     final draft = await _app.db.readDraft(_draftKey);
     final fields = draft?['fields'] as Map<String, dynamic>? ?? {};
+    nextQuantity = '';
+    keypadTarget = KeypadTarget.quantity;
     lines
       ..clear()
       ..addAll(
@@ -228,6 +311,9 @@ class CartState extends ChangeNotifier {
     }
     if (orderType == 'dine_in' && table.trim().isEmpty) {
       return 'أدخل رقم الطاولة.';
+    }
+    if (orderType == 'delivery' && customer.trim().isEmpty) {
+      return 'أدخل اسم عميل التوصيل.';
     }
     if (orderType == 'delivery' && phone.trim().isEmpty) {
       return 'أدخل هاتف التوصيل.';

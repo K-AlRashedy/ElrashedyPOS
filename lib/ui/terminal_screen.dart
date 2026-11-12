@@ -39,7 +39,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
   }
 
   void _openPrinters() {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PrinterSettingsScreen()));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PrinterSettingsScreen()),
+    );
   }
 
   @override
@@ -47,7 +49,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final app = context.watch<AppState>();
     return CallbackShortcuts(
       bindings: {
-        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyF): () =>
+        LogicalKeySet(
+          LogicalKeyboardKey.control,
+          LogicalKeyboardKey.keyF,
+        ): () =>
             _searchFocus.requestFocus(),
         LogicalKeySet(LogicalKeyboardKey.f2): () => showOrderDialog(context),
         LogicalKeySet(LogicalKeyboardKey.f3): _printKitchen,
@@ -70,7 +75,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(child: MenuPanel(searchFocus: _searchFocus)),
-                    SizedBox(width: 400, child: CartPanel(onKitchenPrint: _printKitchen)),
+                    const SizedBox(width: 400, child: CartPanel()),
                   ],
                 ),
               ),
@@ -98,33 +103,16 @@ class _TopBar extends StatelessWidget {
             children: [
               const Icon(Icons.point_of_sale, color: Colors.white, size: 22),
               const SizedBox(width: 8),
-              const Text('الرشيدي',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-              const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: app.branchId,
-                    dropdownColor: PosColors.brandDark,
-                    iconEnabledColor: Colors.white,
-                    style: const TextStyle(color: Colors.white, fontFamily: 'Cairo', fontWeight: FontWeight.w700),
-                    hint: const Text('اختر الفرع', style: TextStyle(color: Colors.white70)),
-                    items: [
-                      for (final branch in app.branches)
-                        DropdownMenuItem(value: branch.id, child: Text(branch.name)),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) app.selectBranch(value);
-                    },
-                  ),
+              const Text(
+                'الرشيدي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
                 ),
               ),
+              const SizedBox(width: 16),
+              _BranchControl(app: app),
               const SizedBox(width: 12),
               Text(
                 'اليوم التشغيلي ${shift.operationalDate}',
@@ -135,9 +123,19 @@ class _TopBar extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: ActionChip(
-                    avatar: const Icon(Icons.system_update_alt, size: 15, color: PosColors.warning),
-                    label: Text('تحديث ${app.updateVersion}',
-                        style: const TextStyle(color: PosColors.warning, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    avatar: const Icon(
+                      Icons.system_update_alt,
+                      size: 15,
+                      color: PosColors.warning,
+                    ),
+                    label: Text(
+                      'تحديث ${app.updateVersion}',
+                      style: const TextStyle(
+                        color: PosColors.warning,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     onPressed: () => _showUpdate(context, app),
                   ),
                 ),
@@ -149,12 +147,20 @@ class _TopBar extends StatelessWidget {
               const SizedBox(width: 8),
               StatusPill(
                 label: '${app.pendingCount} معلق',
-                color: app.pendingCount == 0 ? PosColors.success : PosColors.warning,
+                color: app.pendingCount == 0
+                    ? PosColors.success
+                    : PosColors.warning,
                 icon: Icons.cloud_upload_outlined,
               ),
               const SizedBox(width: 12),
-              Text(app.user?.displayName ?? '',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+              Text(
+                app.user?.displayName ?? '',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
               const SizedBox(width: 4),
               IconButton(
                 onPressed: () => _confirmLogout(context, app),
@@ -189,7 +195,9 @@ class _TopBar extends StatelessWidget {
               ),
               _BarButton(
                 label: shift.closed ? 'الوردية مقفلة' : 'تقفيل الوردية',
-                icon: shift.closed ? Icons.lock_outline : Icons.lock_open_outlined,
+                icon: shift.closed
+                    ? Icons.lock_outline
+                    : Icons.lock_open_outlined,
                 onTap: () => showShiftDialog(context),
               ),
               _BarButton(
@@ -202,8 +210,11 @@ class _TopBar extends StatelessWidget {
                 label: 'الطابعات',
                 icon: Icons.print_outlined,
                 shortcut: 'F10',
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute<void>(builder: (_) => const PrinterSettingsScreen())),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PrinterSettingsScreen(),
+                  ),
+                ),
               ),
               _BarButton(
                 label: 'فتح الدرج',
@@ -232,7 +243,10 @@ class _TopBar extends StatelessWidget {
       title: 'تسجيل الخروج',
       width: 440,
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('إلغاء')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('إلغاء'),
+        ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
           style: FilledButton.styleFrom(backgroundColor: PosColors.danger),
@@ -258,9 +272,15 @@ class _TopBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('نسخة أحدث من كاشير سطح المكتب متاحة على موقع النظام.', style: TextStyle(height: 1.7)),
+          const Text(
+            'نسخة أحدث من كاشير سطح المكتب متاحة على موقع النظام.',
+            style: TextStyle(height: 1.7),
+          ),
           const SizedBox(height: 12),
-          SelectableText(app.updateUrl ?? '', style: const TextStyle(fontSize: 12, color: PosColors.brand)),
+          SelectableText(
+            app.updateUrl ?? '',
+            style: const TextStyle(fontSize: 12, color: PosColors.brand),
+          ),
           const SizedBox(height: 14),
           OutlinedButton.icon(
             onPressed: () {
@@ -274,6 +294,75 @@ class _TopBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BranchControl extends StatelessWidget {
+  const _BranchControl({required this.app});
+
+  final AppState app;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 230),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+    ),
+    child: app.canChangeBranch
+        ? DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: app.branchId,
+              isDense: true,
+              dropdownColor: PosColors.brandDark,
+              iconEnabledColor: Colors.white,
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w700,
+              ),
+              hint: const Text(
+                'اختر فرع الجهاز',
+                style: TextStyle(color: Colors.white70),
+              ),
+              items: [
+                for (final branch in app.branches)
+                  DropdownMenuItem(
+                    value: branch.id,
+                    child: Text(branch.name, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) app.selectBranch(value);
+              },
+            ),
+          )
+        : Tooltip(
+            message:
+                'الفرع محفوظ على هذا الجهاز ولا يغيّره إلا المستخدم الرئيسي',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, color: Colors.white70, size: 15),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    app.branch?.name ?? 'الفرع غير مضبوط',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: app.branch == null
+                          ? PosColors.warning
+                          : Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+  );
 }
 
 class _BarButton extends StatelessWidget {
@@ -295,21 +384,26 @@ class _BarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(left: 6),
-        child: Tooltip(
-          message: shortcut == null ? label : '$label ($shortcut)',
-          child: TextButton.icon(
-            onPressed: enabled ? onTap : null,
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-              disabledForegroundColor: Colors.white38,
-              backgroundColor: highlight ? PosColors.brand : Colors.white.withValues(alpha: 0.08),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-            ),
-            icon: Icon(icon, size: 16),
-            label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-          ),
+    padding: const EdgeInsets.only(left: 6),
+    child: Tooltip(
+      message: shortcut == null ? label : '$label ($shortcut)',
+      child: TextButton.icon(
+        onPressed: enabled ? onTap : null,
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.white,
+          disabledForegroundColor: Colors.white38,
+          backgroundColor: highlight
+              ? PosColors.brand
+              : Colors.white.withValues(alpha: 0.08),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         ),
-      );
+        icon: Icon(icon, size: 16),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+      ),
+    ),
+  );
 }

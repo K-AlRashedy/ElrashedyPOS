@@ -27,14 +27,10 @@ class AppState extends ChangeNotifier {
   AppState._({required this.db, required this.secure, required this.settings}) {
     cart = CartState(this);
     shift = ShiftState(this);
-    printer = PrinterState(
-      settings.printers,
-      (next) async {
-        settings.printers = next;
-        await saveSettings();
-      },
-      (message, isError) => tell(message, isError: isError),
-    );
+    printer = PrinterState(settings.printers, (next) async {
+      settings.printers = next;
+      await saveSettings();
+    }, (message, isError) => tell(message, isError: isError));
   }
 
   static Future<AppState> create() async {
@@ -77,6 +73,7 @@ class AppState extends ChangeNotifier {
   int _toastSeq = 0;
 
   bool get signedIn => user != null;
+  bool get canChangeBranch => user?.isSuperuser == true;
   ApiClient? get api => _api;
   List<PosBranch> get branches => bootstrap?.branches ?? const [];
   PosBranch? get branch {
@@ -85,6 +82,7 @@ class AppState extends ChangeNotifier {
     }
     return null;
   }
+
   bool get shiftClosed => shift.closed;
 
   void tell(String text, {bool isError = false}) {
@@ -132,13 +130,21 @@ class AppState extends ChangeNotifier {
     final cached = await db.getSetting('bootstrap');
     if (cached == null) {
       await _forgetSession();
-      tell('لا يوجد اتصال بالخادم ولا نسخة محفوظة. اتصل بالإنترنت وسجّل الدخول مرة أخرى.', isError: true);
+      tell(
+        'لا يوجد اتصال بالخادم ولا نسخة محفوظة. اتصل بالإنترنت وسجّل الدخول مرة أخرى.',
+        isError: true,
+      );
       return;
     }
-    await _applyBootstrap(jsonDecode(cached) as Map<String, dynamic>, persist: false);
+    await _applyBootstrap(
+      jsonDecode(cached) as Map<String, dynamic>,
+      persist: false,
+    );
     await loadMenu();
     online = false;
-    tell('وضع عدم الاتصال: يتم عرض آخر بيانات محفوظة. الطلبات ستنتظر المزامنة.');
+    tell(
+      'وضع عدم الاتصال: يتم عرض آخر بيانات محفوظة. الطلبات ستنتظر المزامنة.',
+    );
   }
 
   Future<void> _forgetSession() async {
@@ -155,16 +161,31 @@ class AppState extends ChangeNotifier {
     shift.reset();
   }
 
-  Future<void> _applyBootstrap(Map<String, dynamic> raw, {bool persist = true}) async {
+  Future<void> _applyBootstrap(
+    Map<String, dynamic> raw, {
+    bool persist = true,
+  }) async {
     final data = Bootstrap.fromJson(raw);
     bootstrap = data;
     user = data.user;
     if (persist) await db.setSetting('bootstrap', jsonEncode(raw));
-    final saved = int.tryParse(await db.getSetting('branch') ?? '');
+    final savedRaw = await db.getSetting('branch');
+    final saved = int.tryParse(savedRaw ?? '');
     final allowed = data.branches.map((item) => item.id).toSet();
-    branchId = saved != null && allowed.contains(saved)
-        ? saved
-        : (data.branches.isEmpty ? null : data.branches.first.id);
+    if (savedRaw != null) {
+      branchId = saved != null && allowed.contains(saved) ? saved : null;
+    } else {
+      PosBranch? initialBranch;
+      for (final branch in data.branches) {
+        if (branch.name == data.user.branchName) {
+          initialBranch = branch;
+          break;
+        }
+      }
+      initialBranch ??= data.branches.isEmpty ? null : data.branches.first;
+      branchId = initialBranch?.id;
+      if (branchId != null) await db.setSetting('branch', '$branchId');
+    }
     products = data.products.where((product) => product.isMenuSection).toList();
     _startSync();
     await cart.loadDraft();
@@ -181,7 +202,10 @@ class AppState extends ChangeNotifier {
     _sync = SyncEngine(db, api, userId: currentUser.id);
     _sync!.startPeriodic();
     _clock?.cancel();
-    _clock = Timer.periodic(const Duration(minutes: 1), (_) => notifyListeners());
+    _clock = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => notifyListeners(),
+    );
   }
 
   Future<bool> login({
@@ -216,7 +240,10 @@ class AppState extends ChangeNotifier {
       tell('انتهت مهلة الاتصال بالخادم. راجع العنوان والشبكة.', isError: true);
       return false;
     } on SocketException catch (error) {
-      tell('تعذر الوصول إلى الخادم. ${error.osError?.message ?? ''}', isError: true);
+      tell(
+        'تعذر الوصول إلى الخادم. ${error.osError?.message ?? ''}',
+        isError: true,
+      );
       return false;
     } on FormatException {
       tell('عنوان الخادم غير صحيح.', isError: true);
@@ -235,6 +262,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> selectBranch(int id) async {
+    if (!canChangeBranch) {
+      tell('تغيير الفرع متاح للمستخدم الرئيسي فقط.', isError: true);
+      return;
+    }
+    if (!branches.any((branch) => branch.id == id)) {
+      tell('الفرع المحدد غير متاح لهذا المستخدم.', isError: true);
+      return;
+    }
     if (branchId == id) return;
     branchId = id;
     await db.setSetting('branch', '$id');
@@ -256,7 +291,11 @@ class AppState extends ChangeNotifier {
         products = ApiClient.parseCatalog(raw);
         menuCachedAt = null;
         online = true;
-        await db.saveMenu(key, (raw['products'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>());
+        await db.saveMenu(
+          key,
+          (raw['products'] as List<dynamic>? ?? [])
+              .cast<Map<String, dynamic>>(),
+        );
         notifyListeners();
         return;
       } on ApiException catch (error) {
@@ -299,7 +338,10 @@ class AppState extends ChangeNotifier {
     if (report.authFailure) {
       await _forgetSession();
       notifyListeners();
-      tell(report.blockedReason ?? 'انتهت الجلسة. سجّل الدخول مرة أخرى.', isError: true);
+      tell(
+        report.blockedReason ?? 'انتهت الجلسة. سجّل الدخول مرة أخرى.',
+        isError: true,
+      );
     } else if (report.blockedReason != null) {
       tell(report.blockedReason!, isError: true);
     }
@@ -324,8 +366,12 @@ class AppState extends ChangeNotifier {
   }
 
   static bool _isNewer(String candidate, String current) {
-    List<int> parts(String value) =>
-        value.split('.').map((part) => int.tryParse(part.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0).toList();
+    List<int> parts(String value) => value
+        .split('.')
+        .map(
+          (part) => int.tryParse(part.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+        )
+        .toList();
     final left = parts(candidate);
     final right = parts(current);
     for (var index = 0; index < left.length || index < right.length; index++) {

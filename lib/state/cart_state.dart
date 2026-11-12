@@ -30,10 +30,12 @@ class CartState extends ChangeNotifier {
 
   int get totalCents => lines.fold(0, (sum, line) => sum + line.subtotalCents);
   String get total => formatCents(totalCents);
-  double get itemCount => lines.fold(0.0, (sum, line) => sum + (double.tryParse(line.qty) ?? 0));
+  double get itemCount =>
+      lines.fold(0.0, (sum, line) => sum + (double.tryParse(line.qty) ?? 0));
   bool get isEmpty => lines.isEmpty;
   double? get tenderedValue => double.tryParse(tendered.trim());
-  bool get canSell => lines.isNotEmpty && !saving && !_app.shiftClosed && _app.branchId != null;
+  bool get canSell =>
+      lines.isNotEmpty && !saving && !_app.shiftClosed && _app.branchId != null;
 
   int get changeCents {
     final value = tenderedValue;
@@ -43,23 +45,48 @@ class CartState extends ChangeNotifier {
   }
 
   String get orderSummary => switch (orderType) {
-        'dine_in' => table.trim().isEmpty ? 'صالة' : 'صالة · طاولة $table',
-        'delivery' => 'دليفري',
-        _ => 'تيك أواي',
-      };
+    'dine_in' => table.trim().isEmpty ? 'صالة' : 'صالة · طاولة $table',
+    'delivery' => 'دليفري',
+    _ => 'تيك أواي',
+  };
 
-  void add(PosProduct product) {
-    final index = lines.indexWhere((line) => line.productId == product.id && line.price == product.price);
+  bool add(PosProduct product, {String quantity = '1'}) {
+    if (!isValidQty(quantity)) {
+      _app.tell(
+        'الكمية يجب أن تكون بين 0.001 و 1000 وبثلاث خانات عشرية كحد أقصى.',
+        isError: true,
+      );
+      return false;
+    }
+    final amount = parseQty(quantity);
+    final index = lines.indexWhere(
+      (line) => line.productId == product.id && line.price == product.price,
+    );
     if (index >= 0) {
-      lines[index].qty = formatQty((parseQty(lines[index].qty) + 1).clamp(1, 1000));
+      final next = parseQty(lines[index].qty) + amount;
+      if (next > 1000) {
+        _app.tell('لا يمكن أن تتجاوز كمية الصنف 1000.', isError: true);
+        return false;
+      }
+      lines[index].qty = formatQty(next);
     } else {
-      lines.add(TicketLine(productId: product.id, name: product.name, price: product.price, qty: '1'));
+      lines.add(
+        TicketLine(
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          qty: formatQty(amount),
+        ),
+      );
     }
     _changed();
+    return true;
   }
 
   void increment(int index) {
-    lines[index].qty = formatQty((parseQty(lines[index].qty) + 1).clamp(1, 1000));
+    lines[index].qty = formatQty(
+      (parseQty(lines[index].qty) + 1).clamp(1, 1000),
+    );
     _changed();
   }
 
@@ -80,7 +107,10 @@ class CartState extends ChangeNotifier {
 
   void setQty(int index, String value) {
     if (!isValidQty(value)) {
-      _app.tell('الكمية يجب أن تكون بين 0.001 و 1000 وبثلاث خانات عشرية كحد أقصى.', isError: true);
+      _app.tell(
+        'الكمية يجب أن تكون بين 0.001 و 1000 وبثلاث خانات عشرية كحد أقصى.',
+        isError: true,
+      );
       notifyListeners();
       return;
     }
@@ -172,8 +202,11 @@ class CartState extends ChangeNotifier {
     final fields = draft?['fields'] as Map<String, dynamic>? ?? {};
     lines
       ..clear()
-      ..addAll(((draft?['lines'] as List<dynamic>?) ?? [])
-          .map((item) => TicketLine.fromJson(item as Map<String, dynamic>)));
+      ..addAll(
+        ((draft?['lines'] as List<dynamic>?) ?? []).map(
+          (item) => TicketLine.fromJson(item as Map<String, dynamic>),
+        ),
+      );
     draftId = draft?['clientId'] as String? ?? _uuid.v4();
     orderType = fields['type'] as String? ?? 'takeaway';
     table = fields['table'] as String? ?? '';
@@ -193,13 +226,23 @@ class CartState extends ChangeNotifier {
     for (final line in lines) {
       if (!isValidQty(line.qty)) return 'راجع الأصناف والكميات.';
     }
-    if (orderType == 'dine_in' && table.trim().isEmpty) return 'أدخل رقم الطاولة.';
-    if (orderType == 'delivery' && phone.trim().isEmpty) return 'أدخل هاتف التوصيل.';
-    if (orderType == 'delivery' && address.trim().isEmpty) return 'أدخل عنوان التوصيل.';
+    if (orderType == 'dine_in' && table.trim().isEmpty) {
+      return 'أدخل رقم الطاولة.';
+    }
+    if (orderType == 'delivery' && phone.trim().isEmpty) {
+      return 'أدخل هاتف التوصيل.';
+    }
+    if (orderType == 'delivery' && address.trim().isEmpty) {
+      return 'أدخل عنوان التوصيل.';
+    }
     if (payment == 'cash' && tendered.trim().isNotEmpty) {
       final value = tenderedValue;
-      if (value == null || !value.isFinite) return 'أدخل مبلغاً مدفوعاً صحيحاً.';
-      if ((value * 100).round() < totalCents) return 'المبلغ المدفوع أقل من إجمالي الطلب.';
+      if (value == null || !value.isFinite) {
+        return 'أدخل مبلغاً مدفوعاً صحيحاً.';
+      }
+      if ((value * 100).round() < totalCents) {
+        return 'المبلغ المدفوع أقل من إجمالي الطلب.';
+      }
     }
     return null;
   }
@@ -230,7 +273,10 @@ class CartState extends ChangeNotifier {
   Future<Ticket?> checkout(String paymentMethod) async {
     if (saving) return null;
     if (_app.shiftClosed) {
-      _app.tell('تم تقفيل هذه الوردية بالفعل. اختر فرعاً أو وردية مفتوحة للمتابعة.', isError: true);
+      _app.tell(
+        'تم تقفيل هذه الوردية بالفعل. اختر فرعاً أو وردية مفتوحة للمتابعة.',
+        isError: true,
+      );
       return null;
     }
     if (_app.user == null || _app.branch == null) {
@@ -251,16 +297,25 @@ class CartState extends ChangeNotifier {
       await _app.db.saveTicket(ticket);
       reset();
       await _app.refreshPending();
+
+      // Payment should produce the receipt immediately. Do not make a cashier
+      // wait for a slow or unavailable server before the print job starts.
+      await _app.printer.printTicket(ticket, kitchen: false, force: true);
+      await _app.printer.printTicket(ticket, kitchen: true);
+
       await _app.syncNow();
       final stored = await _app.db.ticketByClientId(ticket.clientId) ?? ticket;
-      _app.tell(stored.synced
-          ? 'تم حفظ البيع رقم ${stored.serverId} ومزامنته.'
-          : 'تم حفظ الطلب على الجهاز. سيُزامَن تلقائياً عند عودة الاتصال.');
-      await _app.printer.printTicket(stored, kitchen: false);
-      await _app.printer.printTicket(stored, kitchen: true);
+      _app.tell(
+        stored.synced
+            ? 'تم حفظ البيع رقم ${stored.serverId} ومزامنته.'
+            : 'تم حفظ الطلب على الجهاز. سيُزامَن تلقائياً عند عودة الاتصال.',
+      );
       return stored;
     } catch (error) {
-      _app.tell('تعذر حفظ الطلب على الجهاز. راجع مساحة التخزين وقائمة الطلبات السابقة. $error', isError: true);
+      _app.tell(
+        'تعذر حفظ الطلب على الجهاز. راجع مساحة التخزين وقائمة الطلبات السابقة. $error',
+        isError: true,
+      );
       return null;
     } finally {
       saving = false;

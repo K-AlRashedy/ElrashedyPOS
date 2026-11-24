@@ -163,7 +163,7 @@ class _TopBar extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               IconButton(
-                onPressed: () => _confirmLogout(context, app),
+                onPressed: () => showLogoutDialog(context),
                 icon: const Icon(Icons.logout, color: Colors.white70, size: 19),
                 tooltip: 'تسجيل الخروج',
               ),
@@ -192,13 +192,6 @@ class _TopBar extends StatelessWidget {
                 shortcut: 'F7',
                 enabled: !shift.closed,
                 onTap: () => showSupplierDialog(context),
-              ),
-              _BarButton(
-                label: shift.closed ? 'الوردية مقفلة' : 'تقفيل الوردية',
-                icon: shift.closed
-                    ? Icons.lock_outline
-                    : Icons.lock_open_outlined,
-                onTap: () => showShiftDialog(context),
               ),
               _BarButton(
                 label: 'الطلبات السابقة',
@@ -235,32 +228,6 @@ class _TopBar extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _confirmLogout(BuildContext context, AppState app) async {
-    final confirmed = await showPosDialog<bool>(
-      context,
-      title: 'تسجيل الخروج',
-      width: 440,
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('إلغاء'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: FilledButton.styleFrom(backgroundColor: PosColors.danger),
-          child: const Text('خروج'),
-        ),
-      ],
-      child: Text(
-        app.pendingCount > 0
-            ? 'يوجد ${app.pendingCount} طلب لم تتم مزامنته. سيبقى محفوظاً على هذا الجهاز ويمكن مزامنته بعد تسجيل الدخول مرة أخرى.'
-            : 'سيتم إلغاء رمز هذا الجهاز من النظام. الطلبات المحفوظة تبقى على الجهاز.',
-        style: const TextStyle(height: 1.7),
-      ),
-    );
-    if (confirmed == true) await app.logout();
   }
 
   Future<void> _showUpdate(BuildContext context, AppState app) async {

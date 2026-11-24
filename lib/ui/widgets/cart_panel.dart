@@ -146,6 +146,52 @@ class CartPanel extends StatelessWidget {
                       ],
                     ),
                   ),
+                if (cart.orderType == 'delivery') ...[
+                  Row(
+                    children: [
+                      const Text(
+                        'الأصناف',
+                        style: TextStyle(color: PosColors.muted, fontSize: 12),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${formatCents(cart.subtotalCents)} ج.م',
+                        style: const TextStyle(
+                          color: PosColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          cart.deliveryZoneName.isEmpty
+                              ? 'رسوم التوصيل'
+                              : 'توصيل · ${cart.deliveryZoneName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: PosColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${formatCents(cart.deliveryFeeCents)} ج.م',
+                        style: const TextStyle(
+                          color: PosColors.brand,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: [
                     const Text(

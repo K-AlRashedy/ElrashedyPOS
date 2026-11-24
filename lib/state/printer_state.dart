@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
+import '../core/api_client.dart';
 import '../core/settings.dart';
 import '../core/ticket.dart';
 import '../printing/printer_service.dart';
@@ -18,6 +20,7 @@ class PrinterState extends ChangeNotifier {
   final Future<void> Function(PrinterSettings) _onSave;
   final void Function(String message, bool isError) _message;
   final PrinterService _service;
+  Future<Uint8List>? _logoFuture;
 
   bool busy = false;
   String? error;
@@ -33,24 +36,61 @@ class PrinterState extends ChangeNotifier {
   Future<List<String>> listPrinters() => _service.listPrinters();
 
   /// Auto-print after checkout. Manual reprints pass [force].
-  Future<bool> printTicket(Ticket ticket, {required bool kitchen, bool force = false}) {
+  Future<bool> printTicket(
+    Ticket ticket, {
+    required bool kitchen,
+    bool force = false,
+    bool isReprint = false,
+  }) {
     final config = kitchen ? settings.kitchen : settings.customer;
-    final auto = kitchen ? settings.autoPrintKitchen : settings.autoPrintCustomer;
+    final auto = kitchen
+        ? settings.autoPrintKitchen
+        : settings.autoPrintCustomer;
     if (!force && !auto) return Future.value(false);
     if (!config.enabled) {
       if (force) _message('الطابعة معطلة. فعّلها من شاشة الطابعات.', true);
       return Future.value(false);
     }
-    return _run(() => _service.printTicket(
-          ticket,
-          config,
-          kitchen: kitchen,
-          header: settings.receiptHeader,
-          footer: settings.receiptFooter,
-        ));
+    return _run(() async {
+      final logo = kitchen || isReprint ? null : await _logo();
+      await _service.printTicket(
+        ticket,
+        config,
+        kitchen: kitchen,
+        header: settings.receiptHeader,
+        footer: settings.receiptFooter,
+        logo: logo,
+        isReprint: isReprint,
+      );
+    });
   }
 
-  Future<bool> testPrint(PrinterConfig config) => _run(() => _service.testPrint(config));
+  Future<bool> printShiftSummary(ShiftSummary summary) {
+    final config = settings.customer;
+    if (!config.enabled) {
+      _message('طابعة الإيصالات معطلة. فعّلها قبل تسجيل الخروج.', true);
+      return Future.value(false);
+    }
+    return _run(() async {
+      await _service.printShiftSummary(
+        summary,
+        config,
+        header: settings.receiptHeader,
+        footer: settings.receiptFooter,
+        logo: await _logo(),
+      );
+    });
+  }
+
+  Future<Uint8List> _logo() => _logoFuture ??= rootBundle
+      .load('assets/branding/elrashedy_receipt_logo.png')
+      .then(
+        (data) =>
+            data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+
+  Future<bool> testPrint(PrinterConfig config) =>
+      _run(() => _service.testPrint(config));
 
   Future<bool> openDrawer() {
     final config = settings.customer;

@@ -1,23 +1,34 @@
 import 'dart:convert';
 
+import 'package:elrashedy_pos/core/models.dart';
 import 'package:elrashedy_pos/core/ticket.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Ticket sampleTicket({String payment = 'cash', String? tendered, String orderType = 'takeaway'}) => Ticket(
-      clientId: '3f2b8c1e-0000-4000-8000-000000000001',
-      userId: 7,
-      branchId: 3,
-      branchName: 'الفرع الرئيسي',
-      orderType: orderType,
-      payment: payment,
-      placedAt: DateTime.utc(2026, 3, 10, 14, 30),
-      tendered: tendered,
-      table: orderType == 'dine_in' ? '12' : '',
-      lines: [
-        TicketLine(productId: 11, name: 'شاورما', price: '45.50', qty: '2'),
-        TicketLine(productId: 12, name: 'مياه', price: '5.00', qty: '1.5', note: 'باردة'),
-      ],
-    );
+Ticket sampleTicket({
+  String payment = 'cash',
+  String? tendered,
+  String orderType = 'takeaway',
+}) => Ticket(
+  clientId: '3f2b8c1e-0000-4000-8000-000000000001',
+  userId: 7,
+  branchId: 3,
+  branchName: 'الفرع الرئيسي',
+  orderType: orderType,
+  payment: payment,
+  placedAt: DateTime.utc(2026, 3, 10, 14, 30),
+  tendered: tendered,
+  table: orderType == 'dine_in' ? '12' : '',
+  lines: [
+    TicketLine(productId: 11, name: 'شاورما', price: '45.50', qty: '2'),
+    TicketLine(
+      productId: 12,
+      name: 'مياه',
+      price: '5.00',
+      qty: '1.5',
+      note: 'باردة',
+    ),
+  ],
+);
 
 void main() {
   test('total is the sum of integer-cent line totals', () {
@@ -41,16 +52,69 @@ void main() {
   test('sync payload carries exactly the keys pos_sync reads', () {
     final payload = sampleTicket(orderType: 'dine_in').toSyncPayload();
     expect(payload.keys.toSet(), {
-      'client_id', 'branch', 'order_type', 'payment', 'tendered', 'total',
-      'placed_at', 'table', 'customer', 'phone', 'address', 'notes', 'lines',
+      'client_id',
+      'branch',
+      'order_type',
+      'payment',
+      'tendered',
+      'total',
+      'placed_at',
+      'table',
+      'customer',
+      'phone',
+      'address',
+      'notes',
+      'delivery_zone',
+      'delivery_fee',
+      'lines',
     });
     expect(payload['branch'], 3);
     expect(payload['order_type'], 'dine_in');
     expect(payload['table'], '12');
     expect(payload['total'], '98.50');
     expect(payload['placed_at'], '2026-03-10T14:30:00.000Z');
-    expect((payload['lines'] as List).first.keys.toSet(), {'id', 'qty', 'price', 'note'});
+    expect((payload['lines'] as List).first.keys.toSet(), {
+      'id',
+      'qty',
+      'price',
+      'note',
+    });
     expect((payload['lines'] as List).first['id'], 11);
+  });
+
+  test('delivery fee is included in the total and sync payload', () {
+    final ticket = Ticket(
+      clientId: '3f2b8c1e-0000-4000-8000-000000000003',
+      userId: 7,
+      branchId: 3,
+      branchName: 'فرع',
+      orderType: 'delivery',
+      payment: 'cash',
+      placedAt: DateTime.utc(2026, 3, 10, 14, 30),
+      customer: 'عميل',
+      phone: '01012345678',
+      address: 'العنوان',
+      deliveryZoneId: 4,
+      deliveryZoneName: 'مدينة نصر',
+      deliveryFee: '25.00',
+      lines: [TicketLine(productId: 1, name: 'صنف', price: '10.00', qty: '2')],
+    );
+    expect(ticket.subtotalCents, 2000);
+    expect(ticket.deliveryFeeCents, 2500);
+    expect(ticket.total, '45.00');
+    expect(ticket.tendered, '45.00');
+    expect(ticket.toSyncPayload()['delivery_zone'], 4);
+    expect(ticket.toSyncPayload()['delivery_fee'], '25.00');
+    final restored = Ticket.fromStorageJson(
+      jsonDecode(jsonEncode(ticket.toStorageJson())) as Map<String, dynamic>,
+    );
+    expect(restored.deliveryZoneName, 'مدينة نصر');
+    expect(restored.total, '45.00');
+  });
+
+  test('Arabic and Persian phone digits normalize for customer lookup', () {
+    expect(DeliveryCustomer.normalizePhone('٠١٠ ١٢٣٤-٥٦٧٨'), '01012345678');
+    expect(DeliveryCustomer.normalizePhone('۰۱۰۱۲۳۴۵۶۷۸'), '01012345678');
   });
 
   test('local time is converted to UTC before it reaches the server', () {
@@ -64,7 +128,10 @@ void main() {
       placedAt: DateTime(2026, 3, 10, 16, 30),
       lines: [TicketLine(productId: 1, name: 'صنف', price: '10.00', qty: '1')],
     );
-    expect(ticket.toSyncPayload()['placed_at'], ticket.placedAt.toUtc().toIso8601String());
+    expect(
+      ticket.toSyncPayload()['placed_at'],
+      ticket.placedAt.toUtc().toIso8601String(),
+    );
   });
 
   test('storage round trip preserves the outbox state', () {
@@ -72,7 +139,9 @@ void main() {
       ..synced = true
       ..serverId = 4321
       ..attempts = 2;
-    final restored = Ticket.fromStorageJson(jsonDecode(jsonEncode(ticket.toStorageJson())) as Map<String, dynamic>);
+    final restored = Ticket.fromStorageJson(
+      jsonDecode(jsonEncode(ticket.toStorageJson())) as Map<String, dynamic>,
+    );
     expect(restored.clientId, ticket.clientId);
     expect(restored.userId, 7);
     expect(restored.branchName, 'الفرع الرئيسي');
@@ -86,7 +155,9 @@ void main() {
 
   test('a failed sync keeps its error message for the cashier', () {
     final ticket = sampleTicket()..error = 'سعر الصنف تغير. راجع المدير.';
-    final restored = Ticket.fromStorageJson(jsonDecode(jsonEncode(ticket.toStorageJson())) as Map<String, dynamic>);
+    final restored = Ticket.fromStorageJson(
+      jsonDecode(jsonEncode(ticket.toStorageJson())) as Map<String, dynamic>,
+    );
     expect(restored.synced, isFalse);
     expect(restored.error, 'سعر الصنف تغير. راجع المدير.');
   });

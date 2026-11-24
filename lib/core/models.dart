@@ -1,3 +1,76 @@
+import 'money.dart';
+
+class DeliveryZone {
+  const DeliveryZone({
+    required this.id,
+    required this.name,
+    required this.deliveryFee,
+    this.isActive = true,
+  });
+
+  final int id;
+  final String name;
+  final String deliveryFee;
+  final bool isActive;
+
+  int get deliveryFeeCents => toCents(deliveryFee);
+
+  factory DeliveryZone.fromJson(Map<String, dynamic> json) => DeliveryZone(
+    id: (json['id'] as num).toInt(),
+    name: json['name'] as String,
+    deliveryFee: json['delivery_fee'].toString(),
+    isActive: json['is_active'] == true,
+  );
+}
+
+class DeliveryCustomer {
+  const DeliveryCustomer({
+    required this.id,
+    required this.phoneNumber,
+    required this.customerName,
+    required this.address,
+    required this.deliveryZone,
+    required this.notes,
+  });
+
+  final int id;
+  final String phoneNumber;
+  final String customerName;
+  final String address;
+  final DeliveryZone deliveryZone;
+  final String notes;
+
+  static String normalizePhone(Object? value) {
+    var phone = value?.toString() ?? '';
+    const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+    const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+    const latinDigits = '0123456789';
+    for (var index = 0; index < 10; index++) {
+      phone = phone
+          .replaceAll(arabicDigits[index], latinDigits[index])
+          .replaceAll(persianDigits[index], latinDigits[index]);
+    }
+    return phone.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  bool get hasValidPhone {
+    final length = normalizePhone(phoneNumber).length;
+    return length >= 6 && length <= 15;
+  }
+
+  factory DeliveryCustomer.fromJson(Map<String, dynamic> json) =>
+      DeliveryCustomer(
+        id: (json['id'] as num).toInt(),
+        phoneNumber: json['phone_number'] as String,
+        customerName: json['customer_name'] as String? ?? '',
+        address: json['address'] as String? ?? '',
+        deliveryZone: DeliveryZone.fromJson(
+          json['delivery_zone'] as Map<String, dynamic>,
+        ),
+        notes: json['notes'] as String? ?? '',
+      );
+}
+
 class PosBranch {
   const PosBranch({required this.id, required this.name});
   final int id;
@@ -52,39 +125,50 @@ class PosProduct {
       category: json['category'] as String? ?? '',
       categoryIds: categoryIds.isNotEmpty
           ? categoryIds
-          : (categories.isNotEmpty ? categories.map((c) => c.id).toList() : [json['category_id']?.toString() ?? '']),
+          : (categories.isNotEmpty
+                ? categories.map((c) => c.id).toList()
+                : [json['category_id']?.toString() ?? '']),
       categories: categories.isNotEmpty
           ? categories
-          : [ProductCategory(id: json['category_id']?.toString() ?? 'other', name: json['category'] as String? ?? 'أصناف أخرى')],
+          : [
+              ProductCategory(
+                id: json['category_id']?.toString() ?? 'other',
+                name: json['category'] as String? ?? 'أصناف أخرى',
+              ),
+            ],
       image: json['image'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'price': price,
-        'category_id': categoryId,
-        'category': category,
-        'category_ids': categoryIds,
-        'categories': categories.map((c) => {'id': c.id, 'name': c.name}).toList(),
-        'image': image,
-      };
+    'id': id,
+    'name': name,
+    'price': price,
+    'category_id': categoryId,
+    'category': category,
+    'category_ids': categoryIds,
+    'categories': categories.map((c) => {'id': c.id, 'name': c.name}).toList(),
+    'image': image,
+  };
 
   bool get isMenuSection => categoryIds.any((id) => id.startsWith('section-'));
 }
 
 class PosEmployee {
-  const PosEmployee({required this.id, required this.name, required this.branchId});
+  const PosEmployee({
+    required this.id,
+    required this.name,
+    required this.branchId,
+  });
   final int id;
   final String name;
   final int branchId;
 
   factory PosEmployee.fromJson(Map<String, dynamic> json) => PosEmployee(
-        id: (json['id'] as num).toInt(),
-        name: json['name'] as String,
-        branchId: (json['branch_id'] as num).toInt(),
-      );
+    id: (json['id'] as num).toInt(),
+    name: json['name'] as String,
+    branchId: (json['branch_id'] as num).toInt(),
+  );
 }
 
 class PosSupplier {
@@ -92,8 +176,10 @@ class PosSupplier {
   final int id;
   final String name;
 
-  factory PosSupplier.fromJson(Map<String, dynamic> json) =>
-      PosSupplier(id: (json['id'] as num).toInt(), name: json['name'] as String);
+  factory PosSupplier.fromJson(Map<String, dynamic> json) => PosSupplier(
+    id: (json['id'] as num).toInt(),
+    name: json['name'] as String,
+  );
 }
 
 class ExpenseAccount {
@@ -103,10 +189,12 @@ class ExpenseAccount {
   final int? parentId;
 
   factory ExpenseAccount.fromJson(Map<String, dynamic> json) => ExpenseAccount(
-        id: (json['id'] as num).toInt(),
-        name: json['name'] as String,
-        parentId: json['parent_id'] == null ? null : (json['parent_id'] as num).toInt(),
-      );
+    id: (json['id'] as num).toInt(),
+    name: json['name'] as String,
+    parentId: json['parent_id'] == null
+        ? null
+        : (json['parent_id'] as num).toInt(),
+  );
 }
 
 class NamedOption {
@@ -114,8 +202,10 @@ class NamedOption {
   final String value;
   final String label;
 
-  factory NamedOption.fromJson(Map<String, dynamic> json) =>
-      NamedOption(value: json['value'] as String, label: json['label'] as String);
+  factory NamedOption.fromJson(Map<String, dynamic> json) => NamedOption(
+    value: json['value'] as String,
+    label: json['label'] as String,
+  );
 }
 
 class PosUser {
@@ -138,15 +228,18 @@ class PosUser {
   final String? branchName;
 
   factory PosUser.fromJson(Map<String, dynamic> json) => PosUser(
-        id: (json['id'] as num).toInt(),
-        username: json['username'] as String,
-        displayName: json['display_name'] as String? ?? json['username'] as String,
-        isSuperuser: json['is_superuser'] as bool? ?? false,
-        employeeId: json['employee_id'] == null ? null : (json['employee_id'] as num).toInt(),
-        branchName: json['branch_name'] as String?,
-        permissions: (json['permissions'] as Map<String, dynamic>? ?? {})
-            .map((key, value) => MapEntry(key, value == true)),
-      );
+    id: (json['id'] as num).toInt(),
+    username: json['username'] as String,
+    displayName: json['display_name'] as String? ?? json['username'] as String,
+    isSuperuser: json['is_superuser'] as bool? ?? false,
+    employeeId: json['employee_id'] == null
+        ? null
+        : (json['employee_id'] as num).toInt(),
+    branchName: json['branch_name'] as String?,
+    permissions: (json['permissions'] as Map<String, dynamic>? ?? {}).map(
+      (key, value) => MapEntry(key, value == true),
+    ),
+  );
 }
 
 class Bootstrap {
@@ -158,6 +251,7 @@ class Bootstrap {
     required this.subAccounts,
     required this.employees,
     required this.suppliers,
+    required this.deliveryZones,
     required this.shifts,
     required this.orderTypes,
     required this.paymentMethods,
@@ -171,6 +265,7 @@ class Bootstrap {
   final List<ExpenseAccount> subAccounts;
   final List<PosEmployee> employees;
   final List<PosSupplier> suppliers;
+  final List<DeliveryZone> deliveryZones;
   final List<NamedOption> shifts;
   final List<NamedOption> orderTypes;
   final List<NamedOption> paymentMethods;
@@ -178,7 +273,9 @@ class Bootstrap {
 
   factory Bootstrap.fromJson(Map<String, dynamic> json) {
     List<T> list<T>(String key, T Function(Map<String, dynamic>) parse) =>
-        (json[key] as List<dynamic>? ?? []).map((item) => parse(item as Map<String, dynamic>)).toList();
+        (json[key] as List<dynamic>? ?? [])
+            .map((item) => parse(item as Map<String, dynamic>))
+            .toList();
     final accounts = json['expense_accounts'] as Map<String, dynamic>? ?? {};
     return Bootstrap(
       user: PosUser.fromJson(json['user'] as Map<String, dynamic>),
@@ -192,6 +289,7 @@ class Bootstrap {
           .toList(),
       employees: list('employees', PosEmployee.fromJson),
       suppliers: list('suppliers', PosSupplier.fromJson),
+      deliveryZones: list('delivery_zones', DeliveryZone.fromJson),
       shifts: list('shifts', NamedOption.fromJson),
       orderTypes: list('order_types', NamedOption.fromJson),
       paymentMethods: list('payment_methods', NamedOption.fromJson),

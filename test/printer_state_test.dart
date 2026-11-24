@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:elrashedy_pos/core/api_client.dart';
 import 'package:elrashedy_pos/core/settings.dart';
 import 'package:elrashedy_pos/core/ticket.dart';
 import 'package:elrashedy_pos/printing/printer_service.dart';
@@ -6,6 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _RecordingPrinterService extends PrinterService {
   int ticketCalls = 0;
+  int summaryCalls = 0;
+  Uint8List? lastLogo;
+  bool lastReprint = false;
 
   @override
   Future<void> printTicket(
@@ -14,8 +20,24 @@ class _RecordingPrinterService extends PrinterService {
     required bool kitchen,
     required String header,
     required String footer,
+    Uint8List? logo,
+    bool isReprint = false,
   }) async {
     ticketCalls++;
+    lastLogo = logo;
+    lastReprint = isReprint;
+  }
+
+  @override
+  Future<void> printShiftSummary(
+    ShiftSummary summary,
+    PrinterConfig config, {
+    required String header,
+    required String footer,
+    Uint8List? logo,
+  }) async {
+    summaryCalls++;
+    lastLogo = logo;
   }
 }
 
@@ -31,6 +53,8 @@ Ticket _ticket() => Ticket(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
     'a forced customer receipt bypasses the auto-print preference',
     () async {
@@ -50,6 +74,46 @@ void main() {
         isTrue,
       );
       expect(service.ticketCalls, 1);
+      expect(service.lastLogo, isNotNull);
+
+      expect(
+        await state.printTicket(
+          _ticket(),
+          kitchen: false,
+          force: true,
+          isReprint: true,
+        ),
+        isTrue,
+      );
+      expect(service.ticketCalls, 2);
+      expect(service.lastReprint, isTrue);
+      expect(service.lastLogo, isNull);
+    },
+  );
+
+  test(
+    'the consolidated shift summary always carries the receipt logo',
+    () async {
+      final service = _RecordingPrinterService();
+      final state = PrinterState(
+        PrinterSettings(),
+        (_) async {},
+        (_, _) {},
+        service: service,
+      );
+      const summary = ShiftSummary(
+        operationalDate: '2026-03-10',
+        sales: '100.00',
+        expenses: '10.00',
+        advances: '20.00',
+        suppliers: '30.00',
+        closed: true,
+        cashInId: 55,
+      );
+
+      expect(await state.printShiftSummary(summary), isTrue);
+      expect(service.summaryCalls, 1);
+      expect(service.lastLogo, isNotNull);
     },
   );
 }

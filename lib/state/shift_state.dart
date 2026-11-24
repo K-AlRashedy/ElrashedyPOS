@@ -128,35 +128,49 @@ class ShiftState extends ChangeNotifier {
     }
   }
 
-  /// Mirrors the browser guard: sync, re-read, then refuse if anything is still local.
-  Future<String?> closeShift(String shift) async {
+  Future<ShiftSummary?> closeShift(String shift, String password) async {
     final api = _app.api;
     final id = _app.branchId;
     final user = _app.user;
-    if (api == null || id == null || user == null) return 'لا يوجد فرع محدد.';
+    if (api == null || id == null || user == null) {
+      error = 'لا يوجد فرع محدد.';
+      return null;
+    }
     busy = true;
+    error = null;
     notifyListeners();
     try {
       await _app.syncNow();
       await refresh(silent: true);
       final latest = summary;
-      if (latest == null) return 'تعذر التحقق من بيانات الوردية. اتصل بالخادم أولاً.';
-      if (latest.closed) return 'تم إرسال الوردية للمراجعة بالفعل #${latest.cashInId}.';
+      if (latest == null) {
+        error = 'تعذر التحقق من بيانات الوردية. اتصل بالخادم أولاً.';
+        return null;
+      }
       final pending = (await _app.db.pendingTickets(user.id))
           .where((ticket) =>
               ticket.branchId == id && operationalDateIso(ticket.placedAt) == latest.operationalDate)
           .length;
-      if (pending > 0) return 'يوجد $pending طلب غير متزامن. اتصل بالإنترنت واضغط مزامنة قبل التقفيل.';
-      final cashInId = await api.closeShift(branchId: id, shift: shift);
-      await refresh(silent: true);
-      _app.tell('تم إرسال تقفيل الوردية #$cashInId إلى محاسب الخزينة للمراجعة.');
-      return null;
+      if (pending > 0) {
+        error = 'يوجد $pending طلب غير متزامن. اتصل بالإنترنت واضغط مزامنة قبل التقفيل.';
+        return null;
+      }
+      final report = await api.closeShift(branchId: id, shift: shift, password: password);
+      summary = report;
+      _app.tell('تم إرسال تقفيل الوردية #${report.cashInId} إلى محاسب الخزينة للمراجعة.');
+      return report;
     } on ApiException catch (failure) {
-      return failure.message;
+      error = failure.message;
+      return null;
     } on TimeoutException {
-      return 'انتهت مهلة الاتصال بالخادم. لم يتم تقفيل الوردية.';
+      error = 'انقطعت الاتصال بعد إرسال التقفيل. اضغط تسجيل الخروج مرة أخرى للتحقق وإكمال الطباعة.';
+      return null;
     } on SocketException {
-      return 'لا يوجد اتصال بالخادم. تقفيل الوردية يحتاج اتصالاً.';
+      error = 'انقطعت الاتصال بعد إرسال التقفيل. اضغط تسجيل الخروج مرة أخرى للتحقق وإكمال الطباعة.';
+      return null;
+    } on HttpException {
+      error = 'تعذر الاتصال بالخادم. لم يتم تأكيد التقفيل؛ حاول مرة أخرى.';
+      return null;
     } finally {
       busy = false;
       notifyListeners();

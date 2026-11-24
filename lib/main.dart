@@ -14,6 +14,7 @@ Future<void> main() async {
     titleBarStyle: TitleBarStyle.normal,
   );
   await windowManager.waitUntilReadyToShow(options, () async {
+    await windowManager.setIcon('assets/branding/elrashedy_logo.png');
     await windowManager.show();
     await windowManager.focus();
   });

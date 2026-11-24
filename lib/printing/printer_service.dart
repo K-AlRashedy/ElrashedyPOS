@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../core/api_client.dart';
 import '../core/settings.dart';
 import 'escpos.dart';
 import 'raster.dart';
@@ -33,16 +34,31 @@ class PrinterService {
   }) async {
     if (!config.enabled) return;
     if (!config.isConfigured) {
-      throw PrintException('إعدادات الطابعة غير مكتملة. افتح شاشة الطابعات وأكمل البيانات.');
+      throw PrintException(
+        'إعدادات الطابعة غير مكتملة. افتح شاشة الطابعات وأكمل البيانات.',
+      );
     }
     switch (config.transport) {
       case PrinterTransport.network:
-        final raster = await renderReceipt(elements, widthDots: config.width.dots);
-        await _sendNetwork(config, buildReceiptBytes(raster, kickDrawer: config.kickDrawer));
+        final raster = await renderReceipt(
+          elements,
+          widthDots: config.width.dots,
+        );
+        await _sendNetwork(
+          config,
+          buildReceiptBytes(raster, kickDrawer: config.kickDrawer),
+        );
       case PrinterTransport.usb:
-        final raster = await renderReceipt(elements, widthDots: config.width.dots);
+        final raster = await renderReceipt(
+          elements,
+          widthDots: config.width.dots,
+        );
         _spooler ??= WindowsSpooler();
-        _spooler!.send(config.printerName, buildReceiptBytes(raster, kickDrawer: config.kickDrawer), docName: docName);
+        _spooler!.send(
+          config.printerName,
+          buildReceiptBytes(raster, kickDrawer: config.kickDrawer),
+          docName: docName,
+        );
       case PrinterTransport.pdf:
         await _sendPdf(elements, config, docName: docName);
     }
@@ -54,15 +70,47 @@ class PrinterService {
     required bool kitchen,
     required String header,
     required String footer,
+    Uint8List? logo,
+    bool isReprint = false,
   }) async {
     final elements = kitchen
         ? buildKitchenReceipt(ticket)
-        : buildCustomerReceipt(ticket, header: header, footer: footer);
-    await printElements(elements, config, docName: kitchen ? 'شيك المطبخ' : 'إيصال العميل');
+        : buildCustomerReceipt(
+            ticket,
+            header: header,
+            footer: footer,
+            logo: isReprint ? null : logo,
+            isReprint: isReprint,
+          );
+    await printElements(
+      elements,
+      config,
+      docName: kitchen ? 'شيك المطبخ' : 'إيصال العميل',
+    );
   }
 
-  Future<void> testPrint(PrinterConfig config) =>
-      printElements(buildTestReceipt(config.describe), config, docName: 'طباعة تجريبية');
+  Future<void> printShiftSummary(
+    ShiftSummary summary,
+    PrinterConfig config, {
+    required String header,
+    required String footer,
+    Uint8List? logo,
+  }) => printElements(
+    buildShiftSummaryReceipt(
+      summary,
+      header: header,
+      footer: footer,
+      logo: logo,
+    ),
+    config,
+    docName: 'ملخص الوردية #${summary.cashInId ?? ''}',
+  );
+
+  Future<void> testPrint(PrinterConfig config) => printElements(
+    buildTestReceipt(config.describe),
+    config,
+    docName: 'طباعة تجريبية',
+  );
 
   Future<void> openDrawer(PrinterConfig config) async {
     final builder = EscPosBuilder()
@@ -76,41 +124,69 @@ class PrinterService {
         _spooler ??= WindowsSpooler();
         _spooler!.send(config.printerName, bytes, docName: 'فتح الدرج');
       case PrinterTransport.pdf:
-        throw PrintException('فتح الدرج غير متاح عبر PDF. استخدم طابعة إيصالات شبكية أو USB.');
+        throw PrintException(
+          'فتح الدرج غير متاح عبر PDF. استخدم طابعة إيصالات شبكية أو USB.',
+        );
     }
   }
 
   Future<void> _sendNetwork(PrinterConfig config, Uint8List bytes) async {
     Socket? socket;
     try {
-      socket = await Socket.connect(config.host.trim(), config.port, timeout: const Duration(seconds: 6));
+      socket = await Socket.connect(
+        config.host.trim(),
+        config.port,
+        timeout: const Duration(seconds: 6),
+      );
       socket.add(bytes);
       await socket.flush().timeout(const Duration(seconds: 10));
       await socket.close().timeout(const Duration(seconds: 5));
     } on SocketException catch (error) {
-      throw PrintException('تعذر الوصول إلى الطابعة الشبكية ${config.host}:${config.port}. ${error.osError?.message ?? ''}');
+      throw PrintException(
+        'تعذر الوصول إلى الطابعة الشبكية ${config.host}:${config.port}. ${error.osError?.message ?? ''}',
+      );
     } on TimeoutException {
-      throw PrintException('انتهت مهلة الاتصال بالطابعة ${config.host}:${config.port}.');
+      throw PrintException(
+        'انتهت مهلة الاتصال بالطابعة ${config.host}:${config.port}.',
+      );
     } finally {
       socket?.destroy();
     }
   }
 
-  Future<void> _sendPdf(List<ReceiptElement> elements, PrinterConfig config, {required String docName}) async {
-    final png = await renderReceiptPng(elements, widthDots: config.width.dots);
-    final document = pw.Document();
-    final image = pw.MemoryImage(png);
-    final receiptWidth = config.width == PaperWidth.mm80 ? 80 * PdfPageFormat.mm : 58 * PdfPageFormat.mm;
-    document.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(12 * PdfPageFormat.mm),
-        build: (context) => pw.Align(
-          alignment: pw.Alignment.topCenter,
-          child: pw.Image(image, width: receiptWidth, fit: pw.BoxFit.contain),
-        ),
-      ),
+  Future<void> _sendPdf(
+    List<ReceiptElement> elements,
+    PrinterConfig config, {
+    required String docName,
+  }) async {
+    final receiptWidth = config.width == PaperWidth.mm80
+        ? 80 * PdfPageFormat.mm
+        : 58 * PdfPageFormat.mm;
+    final printableHeight = PdfPageFormat.a4.height - 24 * PdfPageFormat.mm;
+    final maxHeightDots = (printableHeight * config.width.dots / receiptWidth)
+        .floor();
+    final pages = await renderReceiptPngPages(
+      elements,
+      widthDots: config.width.dots,
+      maxHeightDots: maxHeightDots,
     );
+    final document = pw.Document();
+    for (final png in pages) {
+      document.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(12 * PdfPageFormat.mm),
+          build: (context) => pw.Align(
+            alignment: pw.Alignment.topCenter,
+            child: pw.Image(
+              pw.MemoryImage(png),
+              width: receiptWidth,
+              fit: pw.BoxFit.contain,
+            ),
+          ),
+        ),
+      );
+    }
     final bytes = await document.save();
     final installed = await Printing.listPrinters();
     Printer? target;
@@ -123,6 +199,10 @@ class PrinterService {
       onLayout: (format) async => bytes,
       name: docName,
     );
-    if (!ok) throw PrintException('تعذر إرسال الإيصال إلى الطابعة "${config.printerName}".');
+    if (!ok) {
+      throw PrintException(
+        'تعذر إرسال الإيصال إلى الطابعة "${config.printerName}".',
+      );
+    }
   }
 }

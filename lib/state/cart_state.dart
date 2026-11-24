@@ -26,14 +26,39 @@ class CartState extends ChangeNotifier {
   String phone = '';
   String address = '';
   String notes = '';
+  int? deliveryZoneId;
+  String deliveryZoneName = '';
+  String deliveryFee = '0.00';
+  bool deliveryZoneActive = true;
   String payment = 'cash';
   String tendered = '';
   String nextQuantity = '';
   KeypadTarget keypadTarget = KeypadTarget.quantity;
   bool saving = false;
 
-  int get totalCents => lines.fold(0, (sum, line) => sum + line.subtotalCents);
+  int get subtotalCents =>
+      lines.fold(0, (sum, line) => sum + line.subtotalCents);
+  int get deliveryFeeCents {
+    if (orderType != 'delivery') return 0;
+    return deliveryZone?.deliveryFeeCents ?? 0;
+  }
+
+  int get totalCents => subtotalCents + deliveryFeeCents;
   String get total => formatCents(totalCents);
+  DeliveryZone? get deliveryZone {
+    for (final zone in _app.deliveryZones) {
+      if (zone.id == deliveryZoneId) return zone;
+    }
+    final id = deliveryZoneId;
+    if (id == null) return null;
+    return DeliveryZone(
+      id: id,
+      name: deliveryZoneName,
+      deliveryFee: deliveryFee,
+      isActive: deliveryZoneActive,
+    );
+  }
+
   double get itemCount =>
       lines.fold(0.0, (sum, line) => sum + (double.tryParse(line.qty) ?? 0));
   bool get isEmpty => lines.isEmpty;
@@ -42,7 +67,8 @@ class CartState extends ChangeNotifier {
       (orderType == 'delivery' &&
           (customer.trim().isEmpty ||
               phone.trim().isEmpty ||
-              address.trim().isEmpty));
+              address.trim().isEmpty ||
+              deliveryZoneId == null));
   double? get tenderedValue => double.tryParse(tendered.trim());
   bool get canSell =>
       lines.isNotEmpty && !saving && !_app.shiftClosed && _app.branchId != null;
@@ -200,6 +226,14 @@ class CartState extends ChangeNotifier {
     _changed();
   }
 
+  void setDeliveryZone(DeliveryZone? zone) {
+    deliveryZoneId = zone?.id;
+    deliveryZoneName = zone?.name ?? '';
+    deliveryFee = zone == null ? '0.00' : zone.deliveryFee;
+    deliveryZoneActive = zone?.isActive ?? true;
+    _changed();
+  }
+
   void setDetail(String key, String value) {
     switch (key) {
       case 'type':
@@ -240,6 +274,10 @@ class CartState extends ChangeNotifier {
     phone = '';
     address = '';
     notes = '';
+    deliveryZoneId = null;
+    deliveryZoneName = '';
+    deliveryFee = '0.00';
+    deliveryZoneActive = true;
     payment = 'cash';
     tendered = '';
     nextQuantity = '';
@@ -272,6 +310,10 @@ class CartState extends ChangeNotifier {
         'phone': phone,
         'address': address,
         'notes': notes,
+        'deliveryZoneId': deliveryZoneId,
+        'deliveryZoneName': deliveryZoneName,
+        'deliveryFee': deliveryFee,
+        'deliveryZoneActive': deliveryZoneActive,
         'payment': payment,
         'tendered': tendered,
       },
@@ -297,6 +339,10 @@ class CartState extends ChangeNotifier {
     phone = fields['phone'] as String? ?? '';
     address = fields['address'] as String? ?? '';
     notes = fields['notes'] as String? ?? '';
+    deliveryZoneId = (fields['deliveryZoneId'] as num?)?.toInt();
+    deliveryZoneName = fields['deliveryZoneName'] as String? ?? '';
+    deliveryFee = fields['deliveryFee']?.toString() ?? '0.00';
+    deliveryZoneActive = fields['deliveryZoneActive'] != false;
     payment = fields['payment'] as String? ?? 'cash';
     tendered = fields['tendered'] as String? ?? '';
     notifyListeners();
@@ -315,11 +361,20 @@ class CartState extends ChangeNotifier {
     if (orderType == 'delivery' && customer.trim().isEmpty) {
       return 'أدخل اسم عميل التوصيل.';
     }
-    if (orderType == 'delivery' && phone.trim().isEmpty) {
-      return 'أدخل هاتف التوصيل.';
+    if (orderType == 'delivery') {
+      final phoneNumber = DeliveryCustomer.normalizePhone(phone);
+      if (phoneNumber.length < 6 || phoneNumber.length > 15) {
+        return 'أدخل هاتف توصيل صحيحاً من 6 إلى 15 رقماً.';
+      }
     }
     if (orderType == 'delivery' && address.trim().isEmpty) {
       return 'أدخل عنوان التوصيل.';
+    }
+    if (orderType == 'delivery' && deliveryZoneId == null) {
+      return 'اختر منطقة التوصيل.';
+    }
+    if (orderType == 'delivery' && !(deliveryZone?.isActive ?? false)) {
+      return 'منطقة التوصيل المختارة غير نشطة. اختر منطقة أخرى أو راجع المدير.';
     }
     if (payment == 'cash' && tendered.trim().isNotEmpty) {
       final value = tenderedValue;
@@ -351,6 +406,13 @@ class CartState extends ChangeNotifier {
       phone: orderType == 'delivery' ? phone.trim() : '',
       address: orderType == 'delivery' ? address.trim() : '',
       notes: notes.trim(),
+      deliveryZoneId: orderType == 'delivery' ? deliveryZoneId : null,
+      deliveryZoneName: orderType == 'delivery'
+          ? (deliveryZone?.name ?? deliveryZoneName)
+          : '',
+      deliveryFee: orderType == 'delivery'
+          ? formatCents(deliveryFeeCents)
+          : '0.00',
       tendered: value == null ? null : formatCents((value * 100).round()),
     );
   }

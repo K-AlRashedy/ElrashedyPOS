@@ -1,7 +1,7 @@
 name: elrashedy_pos
 description: "Al Rashedy desktop POS terminal — offline-first cashier client for the Django ERP."
 publish_to: "none"
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ^3.13.7
@@ -36,6 +36,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/
+    - assets/branding/
   fonts:
     - family: Cairo
       fonts:

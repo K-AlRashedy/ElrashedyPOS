@@ -8,11 +8,11 @@ import '../theme.dart';
 import '../widgets/common.dart';
 
 Future<void> showHistoryDialog(BuildContext context) => showPosDialog<void>(
-      context,
-      title: 'الطلبات السابقة',
-      width: 720,
-      child: const _HistoryList(),
-    );
+  context,
+  title: 'الطلبات السابقة',
+  width: 720,
+  child: const _HistoryList(),
+);
 
 class _HistoryList extends StatefulWidget {
   const _HistoryList();
@@ -54,7 +54,9 @@ class _HistoryListState extends State<_HistoryList> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final printer = app.printer;
-    final visible = _onlyPending ? _tickets.where((ticket) => !ticket.synced).toList() : _tickets;
+    final visible = _onlyPending
+        ? _tickets.where((ticket) => !ticket.synced).toList()
+        : _tickets;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -63,8 +65,12 @@ class _HistoryListState extends State<_HistoryList> {
           children: [
             StatusPill(
               label: '${app.pendingCount} بانتظار المزامنة',
-              color: app.pendingCount == 0 ? PosColors.success : PosColors.warning,
-              icon: app.pendingCount == 0 ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined,
+              color: app.pendingCount == 0
+                  ? PosColors.success
+                  : PosColors.warning,
+              icon: app.pendingCount == 0
+                  ? Icons.cloud_done_outlined
+                  : Icons.cloud_upload_outlined,
             ),
             const SizedBox(width: 8),
             FilterChip(
@@ -78,14 +84,24 @@ class _HistoryListState extends State<_HistoryList> {
               icon: const Icon(Icons.sync, size: 18),
               label: const Text('مزامنة الآن'),
             ),
-            IconButton(onPressed: _load, icon: const Icon(Icons.refresh, size: 19), tooltip: 'تحديث'),
+            IconButton(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh, size: 19),
+              tooltip: 'تحديث',
+            ),
           ],
         ),
         const SizedBox(height: 8),
         if (_loading)
-          const Padding(padding: EdgeInsets.all(28), child: Center(child: CircularProgressIndicator()))
+          const Padding(
+            padding: EdgeInsets.all(28),
+            child: Center(child: CircularProgressIndicator()),
+          )
         else if (visible.isEmpty)
-          const EmptyHint('لا توجد طلبات محفوظة على هذا الجهاز بعد.', icon: Icons.receipt_long_outlined)
+          const EmptyHint(
+            'لا توجد طلبات محفوظة على هذا الجهاز بعد.',
+            icon: Icons.receipt_long_outlined,
+          )
         else
           for (final ticket in visible.take(60))
             Padding(
@@ -95,7 +111,11 @@ class _HistoryListState extends State<_HistoryList> {
                 decoration: BoxDecoration(
                   color: PosColors.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ticket.synced ? PosColors.border : PosColors.warning.withValues(alpha: 0.5)),
+                  border: Border.all(
+                    color: ticket.synced
+                        ? PosColors.border
+                        : PosColors.warning.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,32 +126,60 @@ class _HistoryListState extends State<_HistoryList> {
                           child: Text(
                             '${ticket.branchName} · ${orderTypeLabels[ticket.orderType] ?? ticket.orderType}'
                             '${ticket.table.isEmpty ? '' : ' · طاولة ${ticket.table}'}',
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                        Text('${ticket.total} ج.م',
-                            style: const TextStyle(fontWeight: FontWeight.w900, color: PosColors.brand)),
+                        Text(
+                          '${ticket.total} ج.م',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: PosColors.brand,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Text(formatTicketTime(ticket.placedAt),
-                            style: const TextStyle(color: PosColors.muted, fontSize: 11.5)),
+                        Text(
+                          formatTicketTime(ticket.placedAt),
+                          style: const TextStyle(
+                            color: PosColors.muted,
+                            fontSize: 11.5,
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Text('#${shortTicketId(ticket.clientId)}',
-                            style: const TextStyle(color: PosColors.muted, fontSize: 11.5)),
+                        Text(
+                          '#${shortTicketId(ticket.clientId)}',
+                          style: const TextStyle(
+                            color: PosColors.muted,
+                            fontSize: 11.5,
+                          ),
+                        ),
                         const Spacer(),
                         StatusPill(
-                          label: ticket.synced ? 'تمت المزامنة #${ticket.serverId}' : 'بانتظار المزامنة',
-                          color: ticket.synced ? PosColors.success : PosColors.warning,
+                          label: ticket.synced
+                              ? 'تمت المزامنة #${ticket.serverId}'
+                              : 'بانتظار المزامنة',
+                          color: ticket.synced
+                              ? PosColors.success
+                              : PosColors.warning,
                         ),
                       ],
                     ),
                     if (ticket.error != null) ...[
                       const SizedBox(height: 6),
-                      Text(ticket.error!,
-                          style: const TextStyle(color: PosColors.danger, fontSize: 11.5, height: 1.5)),
+                      Text(
+                        ticket.error!,
+                        style: const TextStyle(
+                          color: PosColors.danger,
+                          fontSize: 11.5,
+                          height: 1.5,
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 8),
                     Row(
@@ -139,7 +187,12 @@ class _HistoryListState extends State<_HistoryList> {
                         OutlinedButton.icon(
                           onPressed: printer.busy
                               ? null
-                              : () => printer.printTicket(ticket, kitchen: false, force: true),
+                              : () => printer.printTicket(
+                                  ticket,
+                                  kitchen: false,
+                                  force: true,
+                                  isReprint: true,
+                                ),
                           icon: const Icon(Icons.receipt_outlined, size: 16),
                           label: const Text('إيصال للعميل'),
                         ),
@@ -147,8 +200,15 @@ class _HistoryListState extends State<_HistoryList> {
                         OutlinedButton.icon(
                           onPressed: printer.busy
                               ? null
-                              : () => printer.printTicket(ticket, kitchen: true, force: true),
-                          icon: const Icon(Icons.soup_kitchen_outlined, size: 16),
+                              : () => printer.printTicket(
+                                  ticket,
+                                  kitchen: true,
+                                  force: true,
+                                ),
+                          icon: const Icon(
+                            Icons.soup_kitchen_outlined,
+                            size: 16,
+                          ),
                           label: const Text('شيك المطبخ'),
                         ),
                       ],
@@ -158,8 +218,10 @@ class _HistoryListState extends State<_HistoryList> {
               ),
             ),
         if (visible.length > 60)
-          Text('يتم عرض أحدث 60 طلباً من أصل ${visible.length}.',
-              style: const TextStyle(color: PosColors.muted, fontSize: 11.5)),
+          Text(
+            'يتم عرض أحدث 60 طلباً من أصل ${visible.length}.',
+            style: const TextStyle(color: PosColors.muted, fontSize: 11.5),
+          ),
       ],
     );
   }

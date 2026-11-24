@@ -60,6 +60,7 @@ class AppState extends ChangeNotifier {
   Bootstrap? bootstrap;
   int? branchId;
   List<PosProduct> products = [];
+  List<DeliveryZone> deliveryZones = [];
   String? menuCachedAt;
   bool busy = false;
   bool online = true;
@@ -156,6 +157,7 @@ class AppState extends ChangeNotifier {
     bootstrap = null;
     branchId = null;
     products = [];
+    deliveryZones = [];
     pendingCount = 0;
     cart.reset();
     shift.reset();
@@ -187,6 +189,7 @@ class AppState extends ChangeNotifier {
       if (branchId != null) await db.setSetting('branch', '$branchId');
     }
     products = data.products.where((product) => product.isMenuSection).toList();
+    deliveryZones = data.deliveryZones;
     _startSync();
     await cart.loadDraft();
     await refreshPending();
@@ -255,10 +258,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    final api = _api;
-    if (api != null) await api.logout();
-    await _forgetSession();
-    notifyListeners();
+    try {
+      await _api?.logout();
+    } catch (_) {
+      // Local logout must still complete when server revocation is unreachable.
+    } finally {
+      await _forgetSession();
+      notifyListeners();
+    }
   }
 
   Future<void> selectBranch(int id) async {
@@ -319,6 +326,23 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshDeliveryZones() async {
+    final api = _api;
+    if (api == null) return;
+    try {
+      deliveryZones = await api.deliveryZones();
+      notifyListeners();
+    } on ApiException catch (error) {
+      if (error.isAuth) tell(error.message, isError: true);
+    } on TimeoutException {
+      online = false;
+    } on SocketException {
+      online = false;
+    } on HttpException {
+      online = false;
+    }
+  }
+
   Future<void> refreshPending() async {
     final currentUser = user;
     if (currentUser == null) return;
@@ -349,6 +373,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> refreshAll() async {
     await loadMenu();
+    await refreshDeliveryZones();
     await shift.refresh(silent: true);
     await syncNow();
   }

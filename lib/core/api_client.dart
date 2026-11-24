@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'money.dart';
 import 'ticket.dart';
 
 class ApiException implements Exception {
@@ -20,10 +21,87 @@ class ApiException implements Exception {
 }
 
 class SyncResult {
-  const SyncResult({required this.saleId, required this.total, required this.created});
+  const SyncResult({
+    required this.saleId,
+    required this.total,
+    required this.created,
+  });
   final int saleId;
   final String total;
   final bool created;
+}
+
+class ShiftItemSummary {
+  const ShiftItemSummary({
+    required this.id,
+    required this.name,
+    required this.quantity,
+    required this.amount,
+  });
+
+  final String id;
+  final String name;
+  final String quantity;
+  final String amount;
+
+  int get amountCents => toCents(amount);
+
+  factory ShiftItemSummary.fromJson(Map<String, dynamic> json) =>
+      ShiftItemSummary(
+        id: json['id']?.toString() ?? '',
+        name: json['name'] as String? ?? '',
+        quantity: json['quantity']?.toString() ?? '0',
+        amount: json['amount']?.toString() ?? '0',
+      );
+}
+
+class ShiftCategorySummary {
+  const ShiftCategorySummary({
+    required this.id,
+    required this.name,
+    required this.items,
+    required this.total,
+  });
+
+  final String id;
+  final String name;
+  final List<ShiftItemSummary> items;
+  final String total;
+
+  int get totalCents => toCents(total);
+
+  factory ShiftCategorySummary.fromJson(Map<String, dynamic> json) =>
+      ShiftCategorySummary(
+        id: json['id']?.toString() ?? '',
+        name: json['name'] as String? ?? '',
+        items: (json['items'] as List<dynamic>? ?? [])
+            .map(
+              (item) => ShiftItemSummary.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+        total: json['total']?.toString() ?? '0',
+      );
+}
+
+class ShiftPaymentSummary {
+  const ShiftPaymentSummary({
+    required this.value,
+    required this.label,
+    required this.amount,
+  });
+
+  final String value;
+  final String label;
+  final String amount;
+
+  int get amountCents => toCents(amount);
+
+  factory ShiftPaymentSummary.fromJson(Map<String, dynamic> json) =>
+      ShiftPaymentSummary(
+        value: json['value'] as String? ?? '',
+        label: json['label'] as String? ?? '',
+        amount: json['amount']?.toString() ?? '0',
+      );
 }
 
 class ShiftSummary {
@@ -36,6 +114,19 @@ class ShiftSummary {
     required this.closed,
     this.previousCashInId,
     this.cashInId,
+    this.branchId,
+    this.branchName = '',
+    this.cashierId,
+    this.cashierName = '',
+    this.shift = '',
+    this.shiftLabel = '',
+    this.realAmount = '0',
+    this.deliveryFees = '0',
+    this.orderCount = 0,
+    this.categories = const [],
+    this.payments = const [],
+    this.generatedAt,
+    this.closedAt,
   });
 
   final String operationalDate;
@@ -46,43 +137,99 @@ class ShiftSummary {
   final bool closed;
   final int? previousCashInId;
   final int? cashInId;
+  final int? branchId;
+  final String branchName;
+  final int? cashierId;
+  final String cashierName;
+  final String shift;
+  final String shiftLabel;
+  final String realAmount;
+  final String deliveryFees;
+  final int orderCount;
+  final List<ShiftCategorySummary> categories;
+  final List<ShiftPaymentSummary> payments;
+  final DateTime? generatedAt;
+  final DateTime? closedAt;
+
+  int get salesCents => toCents(sales);
+  int get expensesCents => toCents(expenses);
+  int get advancesCents => toCents(advances);
+  int get suppliersCents => toCents(suppliers);
+  int get realAmountCents => toCents(realAmount);
+  int get deliveryFeesCents => toCents(deliveryFees);
 
   factory ShiftSummary.fromJson(Map<String, dynamic> json) => ShiftSummary(
-        operationalDate: json['operational_date'] as String? ?? '',
-        sales: json['sales']?.toString() ?? '0',
-        expenses: json['expenses']?.toString() ?? '0',
-        advances: json['advances']?.toString() ?? '0',
-        suppliers: json['suppliers']?.toString() ?? '0',
-        closed: json['closed'] == true,
-        previousCashInId: json['previous_cash_in_id'] == null ? null : (json['previous_cash_in_id'] as num).toInt(),
-        cashInId: json['cash_in_id'] == null ? null : (json['cash_in_id'] as num).toInt(),
-      );
+    operationalDate: json['operational_date'] as String? ?? '',
+    sales: json['sales']?.toString() ?? '0',
+    expenses: json['expenses']?.toString() ?? '0',
+    advances: json['advances']?.toString() ?? '0',
+    suppliers: json['suppliers']?.toString() ?? '0',
+    closed: json['closed'] == true,
+    previousCashInId: json['previous_cash_in_id'] == null
+        ? null
+        : (json['previous_cash_in_id'] as num).toInt(),
+    cashInId: json['cash_in_id'] == null
+        ? null
+        : (json['cash_in_id'] as num).toInt(),
+    branchId: json['branch_id'] == null
+        ? null
+        : (json['branch_id'] as num).toInt(),
+    branchName: json['branch_name'] as String? ?? '',
+    cashierId: json['cashier_id'] == null
+        ? null
+        : (json['cashier_id'] as num).toInt(),
+    cashierName: json['cashier_name'] as String? ?? '',
+    shift: json['shift'] as String? ?? '',
+    shiftLabel: json['shift_label'] as String? ?? '',
+    realAmount: json['real_amount']?.toString() ?? '0',
+    deliveryFees: json['delivery_fees']?.toString() ?? '0',
+    orderCount: (json['order_count'] as num?)?.toInt() ?? 0,
+    categories: (json['categories'] as List<dynamic>? ?? [])
+        .map(
+          (item) => ShiftCategorySummary.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(),
+    payments: (json['payments'] as List<dynamic>? ?? [])
+        .map(
+          (item) => ShiftPaymentSummary.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(),
+    generatedAt: DateTime.tryParse(json['generated_at'] as String? ?? ''),
+    closedAt: DateTime.tryParse(json['closed_at'] as String? ?? ''),
+  );
 }
 
 class ShiftExpense {
-  const ShiftExpense({required this.id, required this.account, required this.amount, required this.reason});
+  const ShiftExpense({
+    required this.id,
+    required this.account,
+    required this.amount,
+    required this.reason,
+  });
   final int id;
   final String account;
   final String amount;
   final String reason;
 
   factory ShiftExpense.fromJson(Map<String, dynamic> json) => ShiftExpense(
-        id: (json['id'] as num).toInt(),
-        account: json['account'] as String? ?? '',
-        amount: json['amount'].toString(),
-        reason: json['reason'] as String? ?? '',
-      );
+    id: (json['id'] as num).toInt(),
+    account: json['account'] as String? ?? '',
+    amount: json['amount'].toString(),
+    reason: json['reason'] as String? ?? '',
+  );
 }
 
 class ApiClient {
   ApiClient({required String baseUrl, this.token, http.Client? httpClient})
-      : baseUrl = normalizeBaseUrl(baseUrl),
-        _http = httpClient ?? http.Client();
+    : baseUrl = normalizeBaseUrl(baseUrl),
+      _http = httpClient ?? http.Client();
 
   static String normalizeBaseUrl(String value) {
     var url = value.trim();
     if (url.isEmpty) return '';
-    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://$url';
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
     while (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);
     }
@@ -96,7 +243,9 @@ class ApiClient {
 
   Uri _uri(String path, [Map<String, String>? query]) {
     final uri = Uri.parse('$baseUrl$path');
-    return query == null || query.isEmpty ? uri : uri.replace(queryParameters: query);
+    return query == null || query.isEmpty
+        ? uri
+        : uri.replace(queryParameters: query);
   }
 
   /// Menu images arrive as site-relative paths (``/media/...``).
@@ -107,15 +256,17 @@ class ApiClient {
   }
 
   Map<String, String> get _headers => {
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Token $token',
-      };
+    'Accept': 'application/json',
+    if (token != null) 'Authorization': 'Token $token',
+  };
 
   Never _fail(http.Response response) {
     var message = 'تعذر الاتصال بالخادم (${response.statusCode}).';
     try {
       final body = jsonDecode(response.body);
-      if (body is Map && body['error'] != null) message = body['error'].toString();
+      if (body is Map && body['error'] != null) {
+        message = body['error'].toString();
+      }
     } catch (_) {
       if (response.statusCode == 401 || response.statusCode == 403) {
         message = 'انتهت الجلسة. سجّل الدخول مرة أخرى.';
@@ -127,18 +278,32 @@ class ApiClient {
   Map<String, dynamic> _decode(http.Response response) {
     if (response.statusCode >= 400) _fail(response);
     final body = jsonDecode(response.body);
-    if (body is! Map<String, dynamic>) throw ApiException(response.statusCode, 'استجابة غير متوقعة من الخادم.');
+    if (body is! Map<String, dynamic>) {
+      throw ApiException(response.statusCode, 'استجابة غير متوقعة من الخادم.');
+    }
     return body;
   }
 
-  Future<Map<String, dynamic>> _get(String path, [Map<String, String>? query]) async {
-    final response = await _http.get(_uri(path, query), headers: _headers).timeout(requestTimeout);
+  Future<Map<String, dynamic>> _get(
+    String path, [
+    Map<String, String>? query,
+  ]) async {
+    final response = await _http
+        .get(_uri(path, query), headers: _headers)
+        .timeout(requestTimeout);
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
     final response = await _http
-        .post(_uri(path), headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(payload))
+        .post(
+          _uri(path),
+          headers: {..._headers, 'Content-Type': 'application/json'},
+          body: jsonEncode(payload),
+        )
         .timeout(requestTimeout);
     return _decode(response);
   }
@@ -153,7 +318,10 @@ class ApiClient {
       'password': password,
       'device_name': deviceName,
     });
-    return (token: body['token'] as String, user: PosUser.fromJson(body['user'] as Map<String, dynamic>));
+    return (
+      token: body['token'] as String,
+      user: PosUser.fromJson(body['user'] as Map<String, dynamic>),
+    );
   }
 
   Future<void> logout() async {
@@ -161,26 +329,69 @@ class ApiClient {
       await _post('/pos-api/v1/auth/logout/', {});
     } on ApiException {
       // A revoked or expired token is already logged out as far as the server cares.
+    } on Exception {
+      // Local session cleanup still completes when the server is unreachable.
     }
   }
 
   Future<Map<String, dynamic>> bootstrapRaw() => _get('/pos-api/v1/bootstrap/');
 
-  Future<Bootstrap> bootstrap() async => Bootstrap.fromJson(await bootstrapRaw());
+  Future<Bootstrap> bootstrap() async =>
+      Bootstrap.fromJson(await bootstrapRaw());
 
-  Future<Map<String, dynamic>> catalogRaw(int branchId) => _get('/pos-api/v1/catalog/$branchId/');
+  Future<Map<String, dynamic>> catalogRaw(int branchId) =>
+      _get('/pos-api/v1/catalog/$branchId/');
 
-  Future<List<PosProduct>> catalog(int branchId) async => parseCatalog(await catalogRaw(branchId));
+  Future<List<PosProduct>> catalog(int branchId) async =>
+      parseCatalog(await catalogRaw(branchId));
 
-  static List<PosProduct> parseCatalog(Map<String, dynamic> body) => (body['products'] as List<dynamic>? ?? [])
-      .map((item) => PosProduct.fromJson(item as Map<String, dynamic>))
-      .where((product) => product.isMenuSection)
-      .toList();
+  Future<List<DeliveryZone>> deliveryZones() async {
+    final body = await _get('/pos-api/v1/delivery/zones/');
+    return (body['zones'] as List<dynamic>? ?? [])
+        .map((item) => DeliveryZone.fromJson(item as Map<String, dynamic>))
+        .where((zone) => zone.isActive)
+        .toList();
+  }
+
+  Future<List<DeliveryCustomer>> searchDeliveryCustomers(String query) async {
+    final body = await _get('/pos-api/v1/delivery/customers/search/', {
+      'q': query,
+    });
+    return (body['customers'] as List<dynamic>? ?? [])
+        .map((item) => DeliveryCustomer.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<DeliveryCustomer> upsertDeliveryCustomer({
+    required String phone,
+    required String customer,
+    required String address,
+    required int deliveryZoneId,
+    required String notes,
+  }) async {
+    final body = await _post('/pos-api/v1/delivery/customers/', {
+      'phone': phone,
+      'customer': customer,
+      'address': address,
+      'delivery_zone': deliveryZoneId,
+      'notes': notes,
+    });
+    return DeliveryCustomer.fromJson(body['customer'] as Map<String, dynamic>);
+  }
+
+  static List<PosProduct> parseCatalog(Map<String, dynamic> body) =>
+      (body['products'] as List<dynamic>? ?? [])
+          .map((item) => PosProduct.fromJson(item as Map<String, dynamic>))
+          .where((product) => product.isMenuSection)
+          .toList();
 
   Future<SyncResult> syncTicket(Ticket ticket) async {
     final response = await _http
-        .post(_uri('/pos-api/v1/sync/'),
-            headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(ticket.toSyncPayload()))
+        .post(
+          _uri('/pos-api/v1/sync/'),
+          headers: {..._headers, 'Content-Type': 'application/json'},
+          body: jsonEncode(ticket.toSyncPayload()),
+        )
         .timeout(requestTimeout);
     final body = _decode(response);
     return SyncResult(
@@ -191,10 +402,16 @@ class ApiClient {
   }
 
   Future<ShiftSummary> shiftSummary(int branchId) async =>
-      ShiftSummary.fromJson(await _get('/pos-api/v1/shift/summary/', {'branch': '$branchId'}));
+      ShiftSummary.fromJson(
+        await _get('/pos-api/v1/shift/summary/', {'branch': '$branchId'}),
+      );
 
-  Future<({List<ShiftExpense> expenses, String total})> shiftExpenses(int branchId) async {
-    final body = await _get('/pos-api/v1/shift/expenses/', {'branch': '$branchId'});
+  Future<({List<ShiftExpense> expenses, String total})> shiftExpenses(
+    int branchId,
+  ) async {
+    final body = await _get('/pos-api/v1/shift/expenses/', {
+      'branch': '$branchId',
+    });
     return (
       expenses: (body['expenses'] as List<dynamic>? ?? [])
           .map((item) => ShiftExpense.fromJson(item as Map<String, dynamic>))
@@ -203,18 +420,53 @@ class ApiClient {
     );
   }
 
-  Future<void> addExpense({required int branchId, required int accountId, required String amount, required String reason}) =>
-      _post('/pos-api/v1/shift/expense/', {'branch': branchId, 'account': accountId, 'amount': amount, 'reason': reason});
+  Future<void> addExpense({
+    required int branchId,
+    required int accountId,
+    required String amount,
+    required String reason,
+  }) => _post('/pos-api/v1/shift/expense/', {
+    'branch': branchId,
+    'account': accountId,
+    'amount': amount,
+    'reason': reason,
+  });
 
-  Future<void> addAdvance({required int branchId, required int employeeId, required String amount, required String notes}) =>
-      _post('/pos-api/v1/shift/advance/', {'branch': branchId, 'employee': employeeId, 'amount': amount, 'notes': notes});
+  Future<void> addAdvance({
+    required int branchId,
+    required int employeeId,
+    required String amount,
+    required String notes,
+  }) => _post('/pos-api/v1/shift/advance/', {
+    'branch': branchId,
+    'employee': employeeId,
+    'amount': amount,
+    'notes': notes,
+  });
 
-  Future<void> addSupplierPayment({required int branchId, required int supplierId, required String amount, required String notes}) =>
-      _post('/pos-api/v1/shift/supplier-payment/', {'branch': branchId, 'supplier': supplierId, 'amount': amount, 'notes': notes});
+  Future<void> addSupplierPayment({
+    required int branchId,
+    required int supplierId,
+    required String amount,
+    required String notes,
+  }) => _post('/pos-api/v1/shift/supplier-payment/', {
+    'branch': branchId,
+    'supplier': supplierId,
+    'amount': amount,
+    'notes': notes,
+  });
 
-  Future<int> closeShift({required int branchId, required String shift}) async {
-    final body = await _post('/pos-api/v1/shift/close/', {'branch': branchId, 'shift': shift});
-    return (body['cash_in_id'] as num).toInt();
+  Future<ShiftSummary> closeShift({
+    required int branchId,
+    required String shift,
+    required String password,
+  }) async {
+    final body = await _post('/pos-api/v1/shift/close/', {
+      'branch': branchId,
+      'shift': shift,
+      'password': password,
+    });
+    return ShiftSummary.fromJson(body['summary'] as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>?> appLatest() async {

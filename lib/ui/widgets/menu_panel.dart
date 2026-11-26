@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/image_cache.dart';
 import '../../core/models.dart';
 import '../../state/app_state.dart';
 import '../../state/cart_state.dart';
@@ -201,6 +204,7 @@ class _MenuPanelState extends State<MenuPanel> {
                                 imageUrl:
                                     app.api?.resolveUrl(visible[index].image) ??
                                     '',
+                                imageCache: app.imageCache,
                                 onTap: () => cart.add(visible[index]),
                               ),
                             ),
@@ -294,11 +298,13 @@ class _ProductCard extends StatelessWidget {
   const _ProductCard({
     required this.product,
     required this.imageUrl,
+    required this.imageCache,
     required this.onTap,
   });
 
   final PosProduct product;
   final String imageUrl;
+  final ProductImageCache imageCache;
   final VoidCallback onTap;
 
   @override
@@ -321,16 +327,9 @@ class _ProductCard extends StatelessWidget {
             children: [
               Expanded(
                 child: hasImage
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        cacheWidth: 320,
-                        errorBuilder: (context, error, stack) =>
-                            const _ProductPlaceholder(),
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                            ? child
-                            : const _ProductPlaceholder(),
+                    ? _CachedProductImage(
+                        imageUrl: imageUrl,
+                        imageCache: imageCache,
                       )
                     : const _ProductPlaceholder(),
               ),
@@ -365,6 +364,75 @@ class _ProductCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CachedProductImage extends StatefulWidget {
+  const _CachedProductImage({
+    required this.imageUrl,
+    required this.imageCache,
+  });
+
+  final String imageUrl;
+  final ProductImageCache imageCache;
+
+  @override
+  State<_CachedProductImage> createState() => _CachedProductImageState();
+}
+
+class _CachedProductImageState extends State<_CachedProductImage> {
+  Future<Uint8List?>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CachedProductImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.imageCache != widget.imageCache) {
+      _initFuture();
+    }
+  }
+
+  void _initFuture() {
+    final cached = widget.imageCache.cachedMemory(widget.imageUrl);
+    _future = cached != null
+        ? null
+        : widget.imageCache.getOrFetch(widget.imageUrl);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mem = widget.imageCache.cachedMemory(widget.imageUrl);
+    if (mem != null) {
+      return Image.memory(
+        mem,
+        fit: BoxFit.cover,
+        cacheWidth: 320,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stack) => const _ProductPlaceholder(),
+      );
+    }
+    return FutureBuilder<Uint8List?>(
+      future: _future,
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (bytes == null || bytes.isEmpty) {
+          return const _ProductPlaceholder();
+        }
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          cacheWidth: 320,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stack) => const _ProductPlaceholder(),
+        );
+      },
     );
   }
 }

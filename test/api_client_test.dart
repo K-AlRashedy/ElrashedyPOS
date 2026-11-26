@@ -40,6 +40,10 @@ void main() {
     test('resolves site-relative menu images against the server', () {
       final api = ApiClient(baseUrl: 'https://app.herokuapp.com');
       expect(
+        api.resolveUrl('/factory/product/2/image/?v=1'),
+        'https://app.herokuapp.com/factory/product/2/image/?v=1',
+      );
+      expect(
         api.resolveUrl('/media/p.jpg'),
         'https://app.herokuapp.com/media/p.jpg',
       );

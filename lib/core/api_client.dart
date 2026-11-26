@@ -248,11 +248,15 @@ class ApiClient {
         : uri.replace(queryParameters: query);
   }
 
-  /// Menu images arrive as site-relative paths (``/media/...``).
+  /// Menu images arrive as DB-backed relative paths (`/factory/product/<id>/image/?v=<n>`)
+  /// or legacy/absolute URLs.
   String resolveUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    return '$baseUrl${path.startsWith('/') ? '' : '/'}$path';
+    final clean = path?.trim();
+    if (clean == null || clean.isEmpty) return '';
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+    return '$baseUrl${clean.startsWith('/') ? '' : '/'}$clean';
   }
 
   Map<String, String> get _headers => {

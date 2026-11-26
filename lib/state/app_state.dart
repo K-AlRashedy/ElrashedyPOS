@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/api_client.dart';
+import '../core/image_cache.dart';
 import '../core/local_db.dart';
 import '../core/models.dart';
 import '../core/secure_store.dart';
@@ -47,6 +48,7 @@ class AppState extends ChangeNotifier {
   final LocalDb db;
   final SecureStore secure;
   final AppSettings settings;
+  final ProductImageCache imageCache = ProductImageCache();
 
   late final CartState cart;
   late final ShiftState shift;
@@ -303,6 +305,7 @@ class AppState extends ChangeNotifier {
           (raw['products'] as List<dynamic>? ?? [])
               .cast<Map<String, dynamic>>(),
         );
+        unawaited(_prefetchMenuImages(api, products));
         notifyListeners();
         return;
       } on ApiException catch (error) {
@@ -407,11 +410,23 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
+  Future<void> _prefetchMenuImages(
+    ApiClient api,
+    List<PosProduct> items,
+  ) async {
+    final urls = items
+        .map((product) => api.resolveUrl(product.image))
+        .where((url) => url.isNotEmpty)
+        .toSet();
+    await imageCache.prefetchAll(urls);
+  }
+
   @override
   void dispose() {
     _clock?.cancel();
     _sync?.stop();
     _api?.close();
+    imageCache.dispose();
     cart.dispose();
     shift.dispose();
     printer.dispose();

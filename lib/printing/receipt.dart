@@ -389,6 +389,13 @@ List<ReceiptElement> buildShiftSummaryReceipt(
     ..add(const ReceiptElement.divider())
     ..add(
       ReceiptElement.text(
+        'صافي الكاش المسلّم للخزنة: ${formatCents(summary.netCashCents)} ج.م',
+        size: ReceiptSize.large,
+        bold: true,
+      ),
+    )
+    ..add(
+      ReceiptElement.text(
         'إجمالي الوردية: ${formatCents(summary.realAmountCents)} ج.م',
         size: ReceiptSize.huge,
         bold: true,

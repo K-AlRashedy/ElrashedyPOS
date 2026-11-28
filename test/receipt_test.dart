@@ -100,7 +100,9 @@ void main() {
       cashierName: 'أحمد',
       shiftLabel: 'صباحية',
       orderCount: 2,
-      realAmount: '160.00',
+      realAmount: '100.00',
+      cashSales: '100.00',
+      netCash: '40.00',
       categories: [
         ShiftCategorySummary(
           id: 'section-1',
@@ -117,8 +119,8 @@ void main() {
         ),
       ],
       payments: [
-        ShiftPaymentSummary(value: 'cash', label: 'نقدي', amount: '60.00'),
-        ShiftPaymentSummary(value: 'visa', label: 'Visa', amount: '40.00'),
+        ShiftPaymentSummary(value: 'cash', label: 'نقدي', amount: '100.00'),
+        ShiftPaymentSummary(value: 'visa', label: 'Visa', amount: '0.00'),
       ],
     );
     final text = joined(
@@ -130,9 +132,10 @@ void main() {
     expect(text, contains('عدد الطلبات: 2'));
     expect(text, contains('سندوتشات'));
     expect(text, contains('شاورما × 2 = 100.00 ج.م'));
-    expect(text, contains('نقدي: 60.00 ج.م'));
-    expect(text, contains('Visa: 40.00 ج.م'));
-    expect(text, contains('إجمالي الوردية: 160.00 ج.م'));
+    expect(text, contains('نقدي: 100.00 ج.م'));
+    expect(text, contains('Visa: 0.00 ج.م'));
+    expect(text, contains('صافي الكاش المسلّم للخزنة: 40.00 ج.م'));
+    expect(text, contains('إجمالي الوردية: 100.00 ج.م'));
   });
 
   test('an unsynced ticket is clearly marked as local only', () {

@@ -193,6 +193,51 @@ class _LogoutFormState extends State<_LogoutForm> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: (summary != null && summary.netCashCents < 0
+                      ? PosColors.danger
+                      : PosColors.brand)
+                  .withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (summary != null && summary.netCashCents < 0
+                        ? PosColors.danger
+                        : PosColors.brand)
+                    .withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 18,
+                  color: summary != null && summary.netCashCents < 0
+                      ? PosColors.danger
+                      : PosColors.brand,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'صافي الكاش المسلّم للخزنة',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  '${formatCents(summary?.netCashCents ?? 0)} ج.م',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                    color: summary != null && summary.netCashCents < 0
+                        ? PosColors.danger
+                        : PosColors.brand,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           if (app.pendingCount > 0)
             Container(
@@ -257,7 +302,7 @@ class _LogoutFormState extends State<_LogoutForm> {
             )
           else
             const Text(
-              'سيتم تجميع المبيعات والمصروفات والسلف والسدادات في توريد واحد لمراجعة محاسب الخزينة، ثم طباعة ملخص واحد قبل تسجيل الخروج.',
+              'سيتم تجميع المبيعات وصافي الكاش المسلّم بعد خصم المصروفات والسلف وسدادات الموردين في توريد واحد لمراجعة محاسب الخزينة، ثم طباعة ملخص الوردية قبل تسجيل الخروج.',
               style: TextStyle(
                 fontSize: 11.5,
                 color: PosColors.muted,
@@ -407,7 +452,7 @@ class _SummaryTile extends StatelessWidget {
                 style: const TextStyle(fontSize: 11, color: PosColors.muted),
               ),
               Text(
-                '${formatCents(((double.tryParse(value) ?? 0) * 100).round())} ج.م',
+                '${formatCents(toCents(value.isEmpty ? '0' : value))} ج.م',
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 14,

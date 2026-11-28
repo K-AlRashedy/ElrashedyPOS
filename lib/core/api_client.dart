@@ -121,6 +121,8 @@ class ShiftSummary {
     this.shift = '',
     this.shiftLabel = '',
     this.realAmount = '0',
+    this.cashSales,
+    this.netCash,
     this.deliveryFees = '0',
     this.orderCount = 0,
     this.categories = const [],
@@ -144,6 +146,8 @@ class ShiftSummary {
   final String shift;
   final String shiftLabel;
   final String realAmount;
+  final String? cashSales;
+  final String? netCash;
   final String deliveryFees;
   final int orderCount;
   final List<ShiftCategorySummary> categories;
@@ -157,6 +161,14 @@ class ShiftSummary {
   int get suppliersCents => toCents(suppliers);
   int get realAmountCents => toCents(realAmount);
   int get deliveryFeesCents => toCents(deliveryFees);
+  int get cashSalesCents => cashSales != null
+      ? toCents(cashSales!)
+      : payments
+            .where((payment) => payment.value == 'cash')
+            .fold<int>(0, (sum, payment) => sum + payment.amountCents);
+  int get netCashCents => netCash != null
+      ? toCents(netCash!)
+      : cashSalesCents - expensesCents - advancesCents - suppliersCents;
 
   factory ShiftSummary.fromJson(Map<String, dynamic> json) => ShiftSummary(
     operationalDate: json['operational_date'] as String? ?? '',
@@ -181,7 +193,10 @@ class ShiftSummary {
     cashierName: json['cashier_name'] as String? ?? '',
     shift: json['shift'] as String? ?? '',
     shiftLabel: json['shift_label'] as String? ?? '',
-    realAmount: json['real_amount']?.toString() ?? '0',
+    realAmount:
+        json['real_amount']?.toString() ?? json['sales']?.toString() ?? '0',
+    cashSales: json['cash_sales']?.toString(),
+    netCash: json['net_cash']?.toString(),
     deliveryFees: json['delivery_fees']?.toString() ?? '0',
     orderCount: (json['order_count'] as num?)?.toInt() ?? 0,
     categories: (json['categories'] as List<dynamic>? ?? [])

@@ -253,14 +253,18 @@ void main() {
             'summary': {
               'operational_date': '2026-03-10',
               'sales': '100.00',
+              'cash_sales': '100.00',
+              'net_cash': '40.00',
               'expenses': '10.00',
               'advances': '20.00',
               'suppliers': '30.00',
               'closed': true,
               'cash_in_id': 55,
-              'real_amount': '160.00',
+              'real_amount': '100.00',
               'categories': [],
-              'payments': [],
+              'payments': [
+                {'value': 'cash', 'label': 'نقدي', 'amount': '100.00'},
+              ],
             },
           }, 200);
         }),
@@ -273,8 +277,31 @@ void main() {
       );
       expect(payload, {'branch': 3, 'shift': 'day', 'password': 'Secret9!'});
       expect(summary.cashInId, 55);
-      expect(summary.realAmount, '160.00');
+      expect(summary.realAmount, '100.00');
+      expect(summary.netCash, '40.00');
+      expect(summary.netCashCents, 4000);
       expect(summary.closed, isTrue);
+    },
+  );
+
+  test(
+    'ShiftSummary computes netCashCents fallback accurately including deficits',
+    () {
+      final summary = ShiftSummary.fromJson({
+        'operational_date': '2026-03-10',
+        'sales': '100.00',
+        'expenses': '10.00',
+        'advances': '20.00',
+        'suppliers': '30.00',
+        'closed': true,
+        'payments': [
+          {'value': 'cash', 'label': 'نقدي', 'amount': '40.00'},
+          {'value': 'visa', 'label': 'Visa', 'amount': '60.00'},
+        ],
+      });
+      expect(summary.realAmount, '100.00');
+      expect(summary.cashSalesCents, 4000);
+      expect(summary.netCashCents, -2000);
     },
   );
 
